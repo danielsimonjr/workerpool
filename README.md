@@ -19,7 +19,8 @@
 - Handles crashed workers
 - Small: 9 kB minified and gzipped (JS build)
 - Supports transferable objects (only for web workers and worker_threads)
-- **TypeScript + WASM build** with up to 4.5x faster pool creation and 1.6x faster queue throughput
+- **TypeScript build** with O(1) circular buffer queues (faster than JS Array.shift)
+- **Optional WASM module** for multi-worker shared memory scenarios (see [WASM Limitations](#wasm-limitations))
 - **AdvancedPool** with intelligent worker scheduling (worker choice strategies, work stealing, task affinity)
 - **Bun compatible** with automatic runtime detection and optimal configuration
 
@@ -890,6 +891,43 @@ import {
 } from 'workerpool/full';
 ```
 
+### WASM Limitations
+
+> **Important Performance Notice**: The WASM module is **4-5x slower** than TypeScript queues for single-threaded operations due to JavaScript-WASM boundary crossing overhead.
+
+**Benchmark Results (50K operations, Node.js v25):**
+
+| Implementation | Time | Comparison |
+|----------------|------|------------|
+| TypeScript FIFOQueue | 59 ms | **Fastest** |
+| WASM Bridge | 93 ms | 1.6x slower |
+| WASMTaskQueue | 221 ms | 3.7x slower |
+
+**When to use WASM (`queueStrategy: 'wasm'`):**
+- Multiple pools sharing a single task queue via SharedArrayBuffer
+- Lock-free atomic operations across worker threads
+- Cross-thread work stealing or task distribution
+- Scenarios requiring shared memory between main thread and workers
+
+**When NOT to use WASM (use default `'fifo'` instead):**
+- Single pool with dedicated workers (most common use case)
+- Performance-critical applications
+- Environments without SharedArrayBuffer support
+- Simple task queuing without cross-thread sharing
+
+```js
+// Default (recommended for most use cases)
+const pool = workerpool.pool({ queueStrategy: 'fifo' });  // TypeScript O(1) queue
+
+// Only use WASM when you need shared memory across threads
+const pool = workerpool.pool({ queueStrategy: 'wasm' });  // Requires SharedArrayBuffer
+
+// Auto-fallback: tries WASM, falls back to FIFO if unavailable
+const pool = workerpool.pool({ queueStrategy: 'wasm-auto' });
+```
+
+The TypeScript build's `FIFOQueue` uses a `GrowableCircularBuffer` with O(1) push/pop operations, which is significantly faster than JavaScript's `Array.shift()` (which is O(n)) and faster than the WASM implementation for single-threaded use.
+
 ## Roadmap
 
 - ~~Implement functions for parallel processing: `map`, `reduce`, `forEach`,
@@ -940,7 +978,7 @@ npm run build:wasm   # Build TypeScript + WASM (src/ts/ → dist/ts/)
 ```
 Outputs: `dist/ts/index.js`, `dist/ts/full.js`, `dist/ts/minimal.js`, `dist/workerpool.wasm`
 
-The TypeScript+WASM build provides up to 34% better performance for concurrent workloads thanks to WASM-accelerated task queues.
+The TypeScript build provides O(1) queue operations via `GrowableCircularBuffer`. The optional WASM module is only beneficial for multi-worker shared memory scenarios (see [WASM Limitations](#wasm-limitations)).
 
 ### Benchmarking
 

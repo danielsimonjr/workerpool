@@ -25,8 +25,21 @@ export type WorkerType = 'auto' | 'web' | 'process' | 'thread';
 
 /**
  * Queue scheduling strategy
+ * - 'fifo': First-in, first-out (default) - RECOMMENDED for most use cases
+ * - 'lifo': Last-in, first-out (stack)
+ * - 'wasm': WASM-backed lock-free queue (requires SharedArrayBuffer)
+ * - 'wasm-auto': Use WASM if available, fallback to FIFO
+ *
+ * ⚠️ IMPORTANT: WASM queues are SLOWER than TypeScript queues for single-threaded
+ * operations (4-5x slower due to JS-WASM boundary crossing overhead).
+ *
+ * ONLY use 'wasm' or 'wasm-auto' when you need:
+ * - Multi-worker shared memory access with lock-free atomics
+ * - Cross-thread queue sharing via SharedArrayBuffer
+ *
+ * For typical single-pool usage, 'fifo' (default) is faster and simpler.
  */
-export type QueueStrategy = 'fifo' | 'lifo';
+export type QueueStrategy = 'fifo' | 'lifo' | 'wasm' | 'wasm-auto';
 
 /**
  * Web Worker options (browser environment)

@@ -293,57 +293,53 @@ describe('WASM Module', () => {
 
 describe('WASM Feature Detection', () => {
   it('should have feature detection exports', async () => {
-    try {
-      const featureModule = await import('../../src/ts/wasm/feature-detection');
-      expect(typeof featureModule.canUseSharedArrayBuffer).toBe('function');
-      expect(typeof featureModule.canUseAtomics).toBe('function');
-      expect(typeof featureModule.canUseWebAssembly).toBe('function');
-      expect(typeof featureModule.canUseWasmThreads).toBe('function');
-    } catch (err) {
-      console.log('    Feature detection module not available:', (err as Error).message);
-    }
+    const featureModule = await import('../../src/ts/wasm/feature-detection');
+    expect(typeof featureModule.hasSharedArrayBuffer).toBe('function');
+    expect(typeof featureModule.hasAtomics).toBe('function');
+    expect(typeof featureModule.hasWebAssembly).toBe('function');
+    expect(typeof featureModule.canUseWasm).toBe('function');
+    expect(typeof featureModule.canUseWasmThreads).toBe('function');
+    expect(typeof featureModule.getFeatureStatus).toBe('function');
   });
 
   it('should detect WebAssembly support', async () => {
-    try {
-      const { canUseWebAssembly } = await import('../../src/ts/wasm/feature-detection');
-      const supported = canUseWebAssembly();
-      expect(typeof supported).toBe('boolean');
-      // Node.js should support WebAssembly
-      expect(supported).toBe(true);
-    } catch (err) {
-      console.log('    canUseWebAssembly not available');
-    }
+    const { hasWebAssembly, canUseWasm } = await import('../../src/ts/wasm/feature-detection');
+    expect(typeof hasWebAssembly()).toBe('boolean');
+    expect(typeof canUseWasm()).toBe('boolean');
+    // Node.js should support WebAssembly
+    expect(hasWebAssembly()).toBe(true);
+    expect(canUseWasm()).toBe(true);
   });
 
   it('should detect SharedArrayBuffer support', async () => {
-    try {
-      const { canUseSharedArrayBuffer } = await import('../../src/ts/wasm/feature-detection');
-      const supported = canUseSharedArrayBuffer();
-      expect(typeof supported).toBe('boolean');
-    } catch (err) {
-      console.log('    canUseSharedArrayBuffer not available');
-    }
+    const { hasSharedArrayBuffer } = await import('../../src/ts/wasm/feature-detection');
+    const supported = hasSharedArrayBuffer();
+    expect(typeof supported).toBe('boolean');
   });
 
   it('should detect Atomics support', async () => {
-    try {
-      const { canUseAtomics } = await import('../../src/ts/wasm/feature-detection');
-      const supported = canUseAtomics();
-      expect(typeof supported).toBe('boolean');
-    } catch (err) {
-      console.log('    canUseAtomics not available');
-    }
+    const { hasAtomics } = await import('../../src/ts/wasm/feature-detection');
+    const supported = hasAtomics();
+    expect(typeof supported).toBe('boolean');
   });
 
   it('should detect WASM threads support', async () => {
-    try {
-      const { canUseWasmThreads } = await import('../../src/ts/wasm/feature-detection');
-      const supported = canUseWasmThreads();
-      expect(typeof supported).toBe('boolean');
-    } catch (err) {
-      console.log('    canUseWasmThreads not available');
-    }
+    const { canUseWasmThreads } = await import('../../src/ts/wasm/feature-detection');
+    const supported = canUseWasmThreads();
+    expect(typeof supported).toBe('boolean');
+  });
+
+  it('should provide feature status report', async () => {
+    const { getFeatureStatus, getFeatureReport } = await import('../../src/ts/wasm/feature-detection');
+    const status = getFeatureStatus();
+    expect(status).toHaveProperty('webAssembly');
+    expect(status).toHaveProperty('sharedArrayBuffer');
+    expect(status).toHaveProperty('atomics');
+    expect(status).toHaveProperty('allFeaturesAvailable');
+
+    const report = getFeatureReport();
+    expect(typeof report).toBe('string');
+    expect(report.length).toBeGreaterThan(0);
   });
 });
 
@@ -359,15 +355,117 @@ describe('WASM Task Queue', () => {
   });
 });
 
+describe('Queue Factory Integration', () => {
+  it('should create FIFO queue via createQueue', async () => {
+    const { createQueue } = await import('../../src/ts/core/TaskQueue');
+    const queue = createQueue('fifo');
+    expect(queue).toBeDefined();
+    expect(typeof queue.push).toBe('function');
+    expect(typeof queue.pop).toBe('function');
+    expect(typeof queue.size).toBe('function');
+    expect(queue.size()).toBe(0);
+  });
+
+  it('should create LIFO queue via createQueue', async () => {
+    const { createQueue } = await import('../../src/ts/core/TaskQueue');
+    const queue = createQueue('lifo');
+    expect(queue).toBeDefined();
+    expect(queue.size()).toBe(0);
+  });
+
+  it('should throw for sync WASM queue creation', async () => {
+    const { createQueue } = await import('../../src/ts/core/TaskQueue');
+    expect(() => createQueue('wasm')).toThrow('WASM queue requires async initialization');
+  });
+
+  it('should fallback to FIFO for wasm-auto in sync mode', async () => {
+    const { createQueue, FIFOQueue } = await import('../../src/ts/core/TaskQueue');
+    const queue = createQueue('wasm-auto');
+    expect(queue).toBeDefined();
+    expect(queue.size()).toBe(0);
+  });
+
+  it('should create FIFO queue via createQueueAsync', async () => {
+    const { createQueueAsync } = await import('../../src/ts/core/TaskQueue');
+    const queue = await createQueueAsync('fifo');
+    expect(queue).toBeDefined();
+    expect(queue.size()).toBe(0);
+  });
+
+  it('should create LIFO queue via createQueueAsync', async () => {
+    const { createQueueAsync } = await import('../../src/ts/core/TaskQueue');
+    const queue = await createQueueAsync('lifo');
+    expect(queue).toBeDefined();
+    expect(queue.size()).toBe(0);
+  });
+
+  it('should handle wasm-auto strategy (WASM or FIFO fallback)', async () => {
+    const { createQueueAsync } = await import('../../src/ts/core/TaskQueue');
+    // wasm-auto should not throw - it falls back to FIFO if WASM unavailable
+    const queue = await createQueueAsync('wasm-auto');
+    expect(queue).toBeDefined();
+    expect(queue.size()).toBe(0);
+  });
+
+  it('should pass through custom queue implementation', async () => {
+    const { createQueue, createQueueAsync } = await import('../../src/ts/core/TaskQueue');
+
+    // Custom queue object
+    const customQueue = {
+      tasks: [] as unknown[],
+      push(task: unknown) { this.tasks.push(task); },
+      pop() { return this.tasks.shift(); },
+      size() { return this.tasks.length; },
+      contains(task: unknown) { return this.tasks.includes(task); },
+      clear() { this.tasks.length = 0; },
+    };
+
+    // Sync
+    const syncResult = createQueue(customQueue as any);
+    expect(syncResult).toBe(customQueue);
+
+    // Async
+    const asyncResult = await createQueueAsync(customQueue as any);
+    expect(asyncResult).toBe(customQueue);
+  });
+
+  it('should export isWasmQueueSupported function', async () => {
+    const { isWasmQueueSupported } = await import('../../src/ts/core/TaskQueue');
+    expect(typeof isWasmQueueSupported).toBe('function');
+    const supported = await isWasmQueueSupported();
+    expect(typeof supported).toBe('boolean');
+  });
+});
+
 describe('Embedded WASM Loader', () => {
-  it('should have EmbeddedWasmLoader export', async () => {
-    try {
-      const module = await import('../../src/ts/wasm/EmbeddedWasmLoader');
-      expect(module.EmbeddedWasmLoader).toBeDefined();
-      expect(typeof module.EmbeddedWasmLoader).toBe('function');
-    } catch (err) {
-      // This may fail if the embedded WASM hasn't been generated
-      console.log('    EmbeddedWasmLoader not available:', (err as Error).message);
-    }
+  it('should have embedded WASM loader functions', async () => {
+    const module = await import('../../src/ts/wasm/EmbeddedWasmLoader');
+    expect(typeof module.setEmbeddedWasm).toBe('function');
+    expect(typeof module.hasEmbeddedWasm).toBe('function');
+    expect(typeof module.getEmbeddedWasmBytes).toBe('function');
+  });
+
+  it('should report no embedded WASM before initialization', async () => {
+    const { hasEmbeddedWasm } = await import('../../src/ts/wasm/EmbeddedWasmLoader');
+    // By default, no embedded WASM is available unless build process sets it
+    expect(typeof hasEmbeddedWasm()).toBe('boolean');
+  });
+
+  it('should set and retrieve embedded WASM data', async () => {
+    const { setEmbeddedWasm, hasEmbeddedWasm, getEmbeddedWasmBytes } = await import(
+      '../../src/ts/wasm/EmbeddedWasmLoader'
+    );
+
+    // Encode a minimal WASM module as base64
+    // This is the smallest valid WASM module: (module)
+    const minimalWasm = new Uint8Array([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]);
+    const base64 = Buffer.from(minimalWasm).toString('base64');
+
+    setEmbeddedWasm(base64);
+    expect(hasEmbeddedWasm()).toBe(true);
+
+    const bytes = getEmbeddedWasmBytes();
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    expect(bytes.length).toBe(minimalWasm.length);
   });
 });

@@ -53,7 +53,8 @@ import {
 import type { TimestampedValue } from './core/circular-buffer';
 
 // Import queue implementations
-import { FIFOQueue, LIFOQueue } from './core/TaskQueue';
+import { FIFOQueue, LIFOQueue, PriorityQueue, createQueue, createQueueAsync, isWasmQueueSupported } from './core/TaskQueue';
+import type { AsyncQueueOptions, PriorityComparator } from './core/TaskQueue';
 
 // ============================================================================
 // Core APIs (same as minimal)
@@ -150,6 +151,40 @@ export { FIFOQueue };
  * LIFO (Last-In-First-Out) task queue implementation.
  */
 export { LIFOQueue };
+
+/**
+ * Priority queue implementation using binary heap.
+ */
+export { PriorityQueue };
+
+/**
+ * Factory function to create queues by strategy (synchronous).
+ * Use createQueueAsync for WASM queue support.
+ */
+export { createQueue };
+
+/**
+ * Factory function to create queues by strategy (async, supports WASM).
+ * @example
+ * const queue = await createQueueAsync('wasm'); // WASM-backed queue
+ * const queue = await createQueueAsync('wasm-auto'); // WASM with FIFO fallback
+ */
+export { createQueueAsync };
+
+/**
+ * Check if WASM queue is supported in the current environment.
+ */
+export { isWasmQueueSupported };
+
+/**
+ * Options for async queue creation.
+ */
+export type { AsyncQueueOptions };
+
+/**
+ * Priority comparator function type.
+ */
+export type { PriorityComparator };
 
 // ============================================================================
 // Transfer Helpers
@@ -680,6 +715,62 @@ export type {
   SIMDOperation,
   ReduceOperation,
 } from './wasm/simd-processor';
+
+// TypeScript SIMD-like utilities (fallback when WASM unavailable)
+export {
+  isNumericArray,
+  isFloat32Array,
+  isFloat64Array,
+  isInt32Array,
+  hasSIMDSupport,
+  simdSumF32,
+  simdMinF32,
+  simdMaxF32,
+  simdMultiplyF32,
+  simdAddF32,
+  simdSquareF32,
+  simdSqrtF32,
+  simdDotProductF32,
+  simdCountF32,
+  simdIndexOfF32,
+  simdIncludesF32,
+  simdCountGreaterThanF32,
+  simdCountLessThanF32,
+  simdSumI32,
+  simdCountI32,
+  simdIndexOfI32,
+  SIMDProcessor as TypeScriptSIMDProcessor,
+  createNumericReducer,
+  defaultSIMDProcessor,
+} from './core/simd-processor';
+
+export type {
+  SIMDOperation as TSSimdOperation,
+  NumericArray,
+  SIMDProcessorOptions,
+} from './core/simd-processor';
+
+// Function Caching - Optimizes repeated function compilation
+export {
+  FunctionCache,
+  createFunctionKey,
+  serializeFunction as serializeFunctionForCache,
+  getGlobalFunctionCache,
+  clearGlobalFunctionCache,
+  compileCached,
+  createCachedChunkProcessor,
+  CACHED_CHUNK_REDUCER,
+  CACHED_CHUNK_FILTER,
+  CACHED_CHUNK_MAPPER,
+  CACHED_CHUNK_FOREACH,
+  CACHED_CHUNK_FIND,
+  CACHED_CHUNK_COUNTER,
+} from './core/function-cache';
+
+export type {
+  FunctionCacheOptions,
+  FunctionCacheStats,
+} from './core/function-cache';
 
 // ============================================================================
 // Graceful Degradation (Main Thread Fallback)

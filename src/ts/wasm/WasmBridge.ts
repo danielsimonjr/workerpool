@@ -40,6 +40,13 @@ export interface QueueStats {
   isFull: boolean;
 }
 
+// Maximum memory pages in WASM module (from asconfig.json)
+const WASM_MAX_PAGES = 256;
+const WASM_PAGE_SIZE = 65536;
+// WASM rounds capacity to power of 2, so max usable capacity is 131072
+// (262144 would need 288 pages which exceeds 256 max)
+const MAX_WASM_CAPACITY = 131072;
+
 /**
  * High-level bridge to WASM task queue and slot allocator
  */
@@ -64,10 +71,14 @@ export class WasmBridge {
     capacity: number = 1024,
     wasmUrl?: string
   ): Promise<WasmBridge> {
+    if (capacity > MAX_WASM_CAPACITY) {
+      throw new Error(`Capacity ${capacity} exceeds WASM maximum of ${MAX_WASM_CAPACITY}`);
+    }
     const pages = calculateMemoryPages(capacity);
+    const maxPages = Math.min(pages * 4, WASM_MAX_PAGES);
     const result = await loadWasm(wasmUrl, {
-      initialMemory: pages,
-      maximumMemory: pages * 4, // Allow some growth
+      initialMemory: Math.min(pages, WASM_MAX_PAGES),
+      maximumMemory: maxPages,
       shared: isSharedMemorySupported(),
     });
 
@@ -83,10 +94,14 @@ export class WasmBridge {
     bytes: ArrayBuffer | Uint8Array,
     capacity: number = 1024
   ): Promise<WasmBridge> {
+    if (capacity > MAX_WASM_CAPACITY) {
+      throw new Error(`Capacity ${capacity} exceeds WASM maximum of ${MAX_WASM_CAPACITY}`);
+    }
     const pages = calculateMemoryPages(capacity);
+    const maxPages = Math.min(pages * 4, WASM_MAX_PAGES);
     const result = await loadWasmFromBytes(bytes, {
-      initialMemory: pages,
-      maximumMemory: pages * 4,
+      initialMemory: Math.min(pages, WASM_MAX_PAGES),
+      maximumMemory: maxPages,
       shared: isSharedMemorySupported(),
     });
 
@@ -102,10 +117,14 @@ export class WasmBridge {
     bytes: ArrayBuffer | Uint8Array,
     capacity: number = 1024
   ): WasmBridge {
+    if (capacity > MAX_WASM_CAPACITY) {
+      throw new Error(`Capacity ${capacity} exceeds WASM maximum of ${MAX_WASM_CAPACITY}`);
+    }
     const pages = calculateMemoryPages(capacity);
+    const maxPages = Math.min(pages * 4, WASM_MAX_PAGES);
     const result = loadWasmSync(bytes, {
-      initialMemory: pages,
-      maximumMemory: pages * 4,
+      initialMemory: Math.min(pages, WASM_MAX_PAGES),
+      maximumMemory: maxPages,
       shared: isSharedMemorySupported(),
     });
 

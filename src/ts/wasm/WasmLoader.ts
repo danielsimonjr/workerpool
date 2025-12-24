@@ -104,13 +104,31 @@ export function isSharedMemorySupported(): boolean {
 }
 
 /**
+ * Round up to next power of 2 (matches WASM nextPowerOf2)
+ */
+function nextPowerOf2(n: number): number {
+  if (n <= 0) return 1;
+  n--;
+  n |= n >> 1;
+  n |= n >> 2;
+  n |= n >> 4;
+  n |= n >> 8;
+  n |= n >> 16;
+  return n + 1;
+}
+
+/**
  * Calculate required memory pages for a given capacity
+ * IMPORTANT: WASM rounds capacity to power of 2, so we must too!
  */
 export function calculateMemoryPages(capacity: number): number {
-  // Header (64 bytes) + ring buffer (capacity * 8 bytes) + slots (capacity * 64 bytes)
+  // WASM rounds capacity to power of 2
+  const actualCapacity = nextPowerOf2(capacity);
+
+  // Header (64 bytes) + ring buffer (actualCapacity * 8 bytes) + slots (actualCapacity * 64 bytes)
   const headerSize = 64;
-  const ringBufferSize = capacity * 8;
-  const slotsSize = capacity * 64;
+  const ringBufferSize = actualCapacity * 8;
+  const slotsSize = actualCapacity * 64;
   const totalBytes = headerSize + ringBufferSize + slotsSize;
 
   // Memory page is 64KB (65536 bytes)

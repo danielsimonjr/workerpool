@@ -9,7 +9,27 @@ This is a fork of [josdejong/workerpool](https://github.com/josdejong/workerpool
 
 ## [Unreleased]
 
+### Fixed
+- **WASM Memory Page Calculation**: Fixed critical bug where JavaScript's `calculateMemoryPages()` didn't match WASM's power-of-2 rounding, causing "memory access out of bounds" errors at capacity 50K+
+- **WASM Capacity Validation**: Added `MAX_WASM_CAPACITY` (131072) constant and validation to prevent exceeding WASM module's 256-page limit
+- **WASM Queue Integration**: Added `createQueueAsync()` with proper `await` to catch async initialization errors
+- **Queue Strategy Types**: Added `'wasm'` and `'wasm-auto'` to `QueueStrategy` type for explicit WASM queue selection
+
 ### Added
+- **WASM Queue Factory Functions**:
+  - `createQueueAsync()` - Async queue creation with WASM support
+  - `isWasmQueueSupported()` - Check if WASM queue is available in current environment
+- **Honest WASM Performance Documentation**:
+  - Added performance warning to `QueueStrategy` type (WASM is 4-5x slower for single-threaded ops)
+  - Added comprehensive performance warning header to `WasmTaskQueue.ts`
+  - Added "WASM Limitations" section to README with benchmark results
+  - Clear guidance on when WASM is beneficial (multi-worker shared memory) vs when to use FIFO (most cases)
+
+### Changed
+- **README**: Updated to accurately describe WASM as optional for shared memory scenarios, not a general performance improvement
+- **WasmLoader.ts**: Added `nextPowerOf2()` function to match WASM's capacity rounding behavior
+
+
 - **Messaging Protocol v2** (TypeScript API):
   - **Protocol Versioning** (`types/messages.ts`):
     - Added `PROTOCOL_VERSION` (v2) and `MIN_PROTOCOL_VERSION` (v1) constants

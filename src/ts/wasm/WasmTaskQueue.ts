@@ -3,6 +3,30 @@
  *
  * Implements TaskQueue interface using WASM ring buffer and slot allocator.
  * Provides O(1) push/pop operations with lock-free concurrency support.
+ *
+ * ============================================================================
+ * ⚠️  PERFORMANCE WARNING - READ BEFORE USING
+ * ============================================================================
+ *
+ * WASM queues are 4-5x SLOWER than TypeScript queues for single-threaded
+ * operations due to JS-WASM boundary crossing overhead.
+ *
+ * Benchmark results (50K operations):
+ *   - TypeScript FIFOQueue:  63.8 ms
+ *   - WASMTaskQueue:        289.4 ms  (4.5x slower)
+ *
+ * ✅ USE WASM QUEUE WHEN:
+ *   - Multiple workers need to share a single queue via SharedArrayBuffer
+ *   - You need lock-free atomic operations across threads
+ *   - Cross-worker task stealing or work distribution
+ *
+ * ❌ DO NOT USE WASM QUEUE WHEN:
+ *   - Single pool with dedicated workers (use FIFOQueue instead)
+ *   - Performance is critical (TypeScript is faster)
+ *   - You don't need cross-thread memory sharing
+ *
+ * For typical workerpool usage, the default FIFOQueue is recommended.
+ * ============================================================================
  */
 
 import type { Task, TaskQueue } from '../types/index';

@@ -265,9 +265,10 @@ export class PriorityQueue<T = unknown> implements TaskQueue<T> {
 }
 
 /**
- * Create a task queue based on strategy
+ * Create a task queue based on strategy (synchronous)
  * @param strategy - Queue strategy: 'fifo', 'lifo', or custom TaskQueue
  * @returns TaskQueue instance
+ * @throws Error if 'wasm' or 'wasm-auto' strategy is requested (use createQueueAsync instead)
  */
 export function createQueue<T = unknown>(
   strategy: QueueStrategy | TaskQueue<T> = 'fifo'
@@ -280,9 +281,96 @@ export function createQueue<T = unknown>(
   switch (strategy) {
     case 'lifo':
       return new LIFOQueue<T>();
+    case 'wasm':
+      throw new Error(
+        "WASM queue requires async initialization. Use createQueueAsync('wasm') or pass wasmBytes option."
+      );
+    case 'wasm-auto':
+      // Fall back to FIFO for synchronous creation
+      return new FIFOQueue<T>();
     case 'fifo':
     default:
       return new FIFOQueue<T>();
+  }
+}
+
+/**
+ * Options for async queue creation
+ */
+export interface AsyncQueueOptions {
+  /** Pre-loaded WASM bytes (avoids network fetch) */
+  wasmBytes?: ArrayBuffer | Uint8Array;
+  /** URL to WASM module */
+  wasmUrl?: string;
+  /** Queue capacity for WASM queues (default: 1024) */
+  capacity?: number;
+}
+
+/**
+ * Create a task queue based on strategy (async, supports WASM)
+ * @param strategy - Queue strategy: 'fifo', 'lifo', 'wasm', 'wasm-auto', or custom TaskQueue
+ * @param options - Options for WASM queue creation
+ * @returns Promise<TaskQueue> instance
+ */
+export async function createQueueAsync<T = unknown>(
+  strategy: QueueStrategy | TaskQueue<T> = 'fifo',
+  options: AsyncQueueOptions = {}
+): Promise<TaskQueue<T>> {
+  if (typeof strategy === 'object' && strategy !== null) {
+    // Custom queue provided
+    return strategy;
+  }
+
+  switch (strategy) {
+    case 'lifo':
+      return new LIFOQueue<T>();
+
+    case 'wasm': {
+      // Dynamically import to avoid bundling WASM code when not needed
+      const { WASMTaskQueue } = await import('../wasm/WasmTaskQueue');
+      if (!WASMTaskQueue.isSupported()) {
+        throw new Error('WASM queue requires SharedArrayBuffer support');
+      }
+      return WASMTaskQueue.create<T>({
+        wasmBytes: options.wasmBytes,
+        wasmUrl: options.wasmUrl,
+        capacity: options.capacity,
+      });
+    }
+
+    case 'wasm-auto': {
+      // Try WASM, fall back to FIFO
+      try {
+        const { WASMTaskQueue } = await import('../wasm/WasmTaskQueue');
+        if (WASMTaskQueue.isSupported()) {
+          // Must await to catch async initialization errors
+          return await WASMTaskQueue.create<T>({
+            wasmBytes: options.wasmBytes,
+            wasmUrl: options.wasmUrl,
+            capacity: options.capacity,
+          });
+        }
+      } catch {
+        // WASM not available or initialization failed, fall through to FIFO
+      }
+      return new FIFOQueue<T>();
+    }
+
+    case 'fifo':
+    default:
+      return new FIFOQueue<T>();
+  }
+}
+
+/**
+ * Check if WASM queue is supported in the current environment
+ */
+export async function isWasmQueueSupported(): Promise<boolean> {
+  try {
+    const { WASMTaskQueue } = await import('../wasm/WasmTaskQueue');
+    return WASMTaskQueue.isSupported();
+  } catch {
+    return false;
   }
 }
 
@@ -294,4 +382,6 @@ export default {
   LIFOQueue,
   PriorityQueue,
   createQueue,
+  createQueueAsync,
+  isWasmQueueSupported,
 };
