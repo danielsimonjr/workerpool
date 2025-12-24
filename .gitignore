@@ -29,3 +29,6 @@ node_modules
 
 # IDE settings
 .idea
+tools/chunking-for-files/chunking-for-files.exe
+tools/compress-for-context/compress-for-context.exe
+tools/create-dependency-graph/create-dependency-graph.exe
