@@ -213,6 +213,7 @@ export class MainThreadExecutor {
         const duration = Date.now() - startTime;
         this.emit('taskComplete', {
           taskId,
+          workerIndex: -1,  // Main thread execution
           duration,
           result,
           timestamp: Date.now(),
@@ -225,6 +226,7 @@ export class MainThreadExecutor {
 
         this.emit('taskError', {
           taskId,
+          workerIndex: -1,  // Main thread execution
           error,
           duration,
           timestamp: Date.now(),

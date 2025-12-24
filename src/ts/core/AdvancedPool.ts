@@ -175,8 +175,8 @@ export class AdvancedPool<TMetadata = unknown> {
   /** Task timing map for performance tracking */
   private readonly taskTimings: Map<number, { startTime: number; workerIndex: number; taskType?: string }> = new Map();
 
-  /** Task ID counter */
-  private taskIdCounter = 0;
+  /** Pending task types - queued until we get taskStart event with taskId */
+  private readonly pendingTaskTypes: string[] = [];
 
   /** Rebalance timer */
   private rebalanceTimer: ReturnType<typeof setInterval> | null = null;
@@ -246,10 +246,14 @@ export class AdvancedPool<TMetadata = unknown> {
   private setupTaskTracking(): void {
     // Track task start for timing
     this.pool.on('taskStart', (event) => {
+      // Get pending taskType if any (empty string means no type)
+      const pendingType = this.pendingTaskTypes.shift();
+      const taskType = pendingType || undefined;
+
       this.taskTimings.set(event.taskId, {
         startTime: event.timestamp,
         workerIndex: event.workerIndex,
-        taskType: undefined, // Will be set from exec options
+        taskType,
       });
 
       this.strategyManager.incrementActiveTasks(event.workerIndex);
@@ -262,46 +266,68 @@ export class AdvancedPool<TMetadata = unknown> {
     // Track task completion for performance
     this.pool.on('taskComplete', (event) => {
       const timing = this.taskTimings.get(event.taskId);
+      // Use workerIndex from event (Pool now provides it correctly)
+      const workerIndex = event.workerIndex;
+
       if (timing) {
-        const duration = event.timestamp - timing.startTime;
+        const duration = event.duration;
 
         // Update strategy stats
-        this.strategyManager.updateStats(timing.workerIndex, duration, true);
-        this.strategyManager.decrementActiveTasks(timing.workerIndex);
+        this.strategyManager.updateStats(workerIndex, duration, true);
+        this.strategyManager.decrementActiveTasks(workerIndex);
 
         // Update affinity router
         if (this.advancedOptions.enableTaskAffinity && timing.taskType) {
           this.affinityRouter.recordTaskCompletion(
-            timing.workerIndex,
+            workerIndex,
             timing.taskType,
             duration,
             true
           );
         }
 
+        if (this.advancedOptions.enableTaskAffinity) {
+          this.affinityRouter.updateWorkerLoad(workerIndex, -1);
+        }
+
         this.taskTimings.delete(event.taskId);
+      } else if (workerIndex >= 0) {
+        // Even without timing info, update strategy stats using event data
+        this.strategyManager.updateStats(workerIndex, event.duration, true);
+        this.strategyManager.decrementActiveTasks(workerIndex);
       }
     });
 
     // Track task errors
     this.pool.on('taskError', (event) => {
       const timing = this.taskTimings.get(event.taskId);
-      if (timing) {
-        const duration = event.timestamp - timing.startTime;
+      // Use workerIndex from event (Pool now provides it correctly)
+      const workerIndex = event.workerIndex;
 
-        this.strategyManager.updateStats(timing.workerIndex, duration, false);
-        this.strategyManager.decrementActiveTasks(timing.workerIndex);
+      if (timing) {
+        const duration = event.duration;
+
+        this.strategyManager.updateStats(workerIndex, duration, false);
+        this.strategyManager.decrementActiveTasks(workerIndex);
 
         if (this.advancedOptions.enableTaskAffinity && timing.taskType) {
           this.affinityRouter.recordTaskCompletion(
-            timing.workerIndex,
+            workerIndex,
             timing.taskType,
             duration,
             false
           );
         }
 
+        if (this.advancedOptions.enableTaskAffinity) {
+          this.affinityRouter.updateWorkerLoad(workerIndex, -1);
+        }
+
         this.taskTimings.delete(event.taskId);
+      } else if (workerIndex >= 0) {
+        // Even without timing info, update strategy stats using event data
+        this.strategyManager.updateStats(workerIndex, event.duration, false);
+        this.strategyManager.decrementActiveTasks(workerIndex);
       }
     });
 
@@ -434,30 +460,31 @@ export class AdvancedPool<TMetadata = unknown> {
     params?: unknown[],
     options?: AdvancedExecOptions<T>
   ): WorkerpoolPromise<T, Error> {
-    const taskId = ++this.taskIdCounter;
-
-    // Store task type for tracking
+    // Queue taskType for association when taskStart event fires
     if (options?.taskType) {
-      // Will be associated when taskStart event fires
-      const timing = this.taskTimings.get(taskId);
-      if (timing) {
-        timing.taskType = options.taskType;
-      }
+      this.pendingTaskTypes.push(options.taskType);
+    } else {
+      this.pendingTaskTypes.push('');  // Placeholder to maintain order
     }
+
+    // Select optimal worker
+    const selectedWorker = this.selectWorker(options);
 
     // Set affinity if key provided
-    if (options?.affinityKey !== undefined) {
-      const selectedWorker = this.selectWorker(options);
-      if (selectedWorker !== undefined) {
-        this.affinityRouter.setAffinity(options.affinityKey, selectedWorker);
-      }
+    if (options?.affinityKey !== undefined && selectedWorker !== undefined) {
+      this.affinityRouter.setAffinity(options.affinityKey, selectedWorker);
     }
 
-    // Execute on pool - cast to work around strict type checking
+    // Build execution options
     const execOptions = options ? {
       on: options.on,
       transfer: options.transfer,
     } : undefined;
+
+    // Use execOnWorker if a specific worker was selected, otherwise use regular exec
+    if (selectedWorker !== undefined) {
+      return this.pool.execOnWorker(selectedWorker, method, params, execOptions) as unknown as WorkerpoolPromise<T, Error>;
+    }
 
     return this.pool.exec(method, params, execOptions) as unknown as WorkerpoolPromise<T, Error>;
   }
@@ -691,14 +718,20 @@ export function cpuIntensivePool<TMetadata = unknown>(
   script?: string | AdvancedPoolOptions,
   options?: AdvancedPoolOptions
 ): AdvancedPool<TMetadata> {
+  // Handle overloaded arguments
+  const baseOptions = typeof script === 'string' ? options : script;
+  const poolScript = typeof script === 'string' ? script : undefined;
+
   const cpuOptions: AdvancedPoolOptions = {
-    ...options,
+    ...baseOptions,
     workerChoiceStrategy: 'fair-share',
     enableWorkStealing: true,
     stealingPolicy: 'busiest-first',
   };
 
-  return new AdvancedPool<TMetadata>(script, cpuOptions);
+  return poolScript
+    ? new AdvancedPool<TMetadata>(poolScript, cpuOptions)
+    : new AdvancedPool<TMetadata>(cpuOptions);
 }
 
 /**
@@ -708,14 +741,20 @@ export function ioIntensivePool<TMetadata = unknown>(
   script?: string | AdvancedPoolOptions,
   options?: AdvancedPoolOptions
 ): AdvancedPool<TMetadata> {
+  // Handle overloaded arguments
+  const baseOptions = typeof script === 'string' ? options : script;
+  const poolScript = typeof script === 'string' ? script : undefined;
+
   const ioOptions: AdvancedPoolOptions = {
-    ...options,
+    ...baseOptions,
     workerChoiceStrategy: 'least-busy',
     enableWorkStealing: true,
     stealingPolicy: 'round-robin',
   };
 
-  return new AdvancedPool<TMetadata>(script, ioOptions);
+  return poolScript
+    ? new AdvancedPool<TMetadata>(poolScript, ioOptions)
+    : new AdvancedPool<TMetadata>(ioOptions);
 }
 
 /**
@@ -725,15 +764,21 @@ export function mixedWorkloadPool<TMetadata = unknown>(
   script?: string | AdvancedPoolOptions,
   options?: AdvancedPoolOptions
 ): AdvancedPool<TMetadata> {
+  // Handle overloaded arguments
+  const baseOptions = typeof script === 'string' ? options : script;
+  const poolScript = typeof script === 'string' ? script : undefined;
+
   const mixedOptions: AdvancedPoolOptions = {
-    ...options,
+    ...baseOptions,
     workerChoiceStrategy: 'fair-share',
     enableWorkStealing: true,
     stealingPolicy: 'busiest-first',
     enableTaskAffinity: true,
   };
 
-  return new AdvancedPool<TMetadata>(script, mixedOptions);
+  return poolScript
+    ? new AdvancedPool<TMetadata>(poolScript, mixedOptions)
+    : new AdvancedPool<TMetadata>(mixedOptions);
 }
 
 // Re-export types for convenience

@@ -72,8 +72,8 @@ const DEBUG_PORT_ALLOCATOR = new DebugPortAllocator();
  */
 export interface PoolEvents {
   taskStart: { taskId: number; method: string; workerIndex: number; timestamp: number };
-  taskComplete: { taskId: number; duration: number; result: unknown; timestamp: number };
-  taskError: { taskId: number; error: Error; duration: number; timestamp: number };
+  taskComplete: { taskId: number; workerIndex: number; duration: number; result: unknown; timestamp: number };
+  taskError: { taskId: number; workerIndex: number; error: Error; duration: number; timestamp: number };
   workerSpawn: { workerIndex: number; timestamp: number };
   workerExit: { workerIndex: number; code: number | undefined; timestamp: number };
   workerError: { workerIndex: number; error: Error; timestamp: number };
@@ -330,6 +330,9 @@ export class Pool<TMetadata = unknown> {
   /** Task tracking */
   private _taskIdCounter = 0;
 
+  /** Map taskId -> workerIndex for event tracking */
+  private _taskWorkerMap: Map<number, number> = new Map();
+
   /** Session manager */
   private _sessionManager: SessionManager | null = null;
 
@@ -535,15 +538,9 @@ export class Pool<TMetadata = unknown> {
       const taskId = ++this._taskIdCounter;
       const startTime = Date.now();
 
-      // Emit task start event
-      this._emit('taskStart', {
-        taskId,
-        method,
-        workerIndex: -1,
-        timestamp: startTime,
-      });
+      // Note: taskStart event is emitted in _next() when task is assigned to a worker
 
-      const task: Task<TMetadata> & { taskId: number; startTime: number } = {
+      const task: Task<TMetadata> & { taskId: number; startTime: number; method: string } = {
         method,
         params: params || [],
         resolver: resolver as Resolver<unknown>,
@@ -598,6 +595,123 @@ export class Pool<TMetadata = unknown> {
     } else {
       throw new TypeError('Function or string expected as argument "method"');
     }
+  }
+
+  /**
+   * Execute a function or registered method on a specific worker
+   *
+   * This method allows targeted execution on a specific worker by index.
+   * If the specified worker is busy, the task will wait until it's available.
+   * If the worker index is invalid, an error is thrown.
+   *
+   * @param workerIndex - Index of the worker to execute on
+   * @param method - Function or registered method name to execute
+   * @param params - Parameters to pass to the function
+   * @param options - Execution options
+   * @returns Promise resolving with the result
+   */
+  execOnWorker<T>(
+    workerIndex: number,
+    method: ((...args: unknown[]) => T) | string,
+    params?: unknown[],
+    options?: EnhancedExecOptions<T>
+  ): WorkerpoolPromise<T, Error> {
+    // Ensure worker exists or can be created
+    while (this.workers.length <= workerIndex && this.workers.length < this.maxWorkers) {
+      const newWorkerIndex = this.workers.length;
+      this.workers.push(this._createWorkerHandler());
+
+      // Emit workerSpawn event
+      this._emit('workerSpawn', {
+        workerIndex: newWorkerIndex,
+        timestamp: Date.now(),
+      });
+    }
+
+    if (workerIndex < 0 || workerIndex >= this.workers.length) {
+      return WorkerpoolPromise.reject(
+        new Error(`Worker index ${workerIndex} is out of bounds (0-${this.workers.length - 1})`)
+      ) as unknown as WorkerpoolPromise<T, Error>;
+    }
+
+    const worker = this.workers[workerIndex];
+
+    // If worker is busy, wait for it
+    if (worker.busy()) {
+      // Queue the task and have it execute on this specific worker when available
+      const resolver = WorkerpoolPromise.defer<T>();
+
+      const checkAndExecute = (): void => {
+        if (!worker.busy()) {
+          this._executeOnWorker(worker, workerIndex, method, params, options, resolver as Resolver<T>);
+        } else {
+          // Check again after a short delay
+          setTimeout(checkAndExecute, 10);
+        }
+      };
+
+      checkAndExecute();
+      return resolver.promise as WorkerpoolPromise<T, Error>;
+    }
+
+    // Worker is available, execute directly
+    const resolver = WorkerpoolPromise.defer<T>();
+    this._executeOnWorker(worker, workerIndex, method, params, options, resolver as Resolver<T>);
+    return resolver.promise as WorkerpoolPromise<T, Error>;
+  }
+
+  /**
+   * Internal method to execute on a specific worker
+   */
+  private _executeOnWorker<T>(
+    worker: WorkerHandler,
+    workerIndex: number,
+    method: ((...args: unknown[]) => T) | string,
+    params: unknown[] | undefined,
+    options: EnhancedExecOptions<T> | undefined,
+    resolver: Resolver<T>
+  ): void {
+    const taskId = ++this._taskIdCounter;
+    const startTime = Date.now();
+
+    // Track worker assignment
+    this._taskWorkerMap.set(taskId, workerIndex);
+
+    // Emit taskStart event
+    const methodName = typeof method === 'string' ? method : 'run';
+    this._emit('taskStart', {
+      taskId,
+      method: methodName,
+      workerIndex,
+      timestamp: startTime,
+    });
+
+    // Handle function vs string method
+    const actualMethod = typeof method === 'string' ? method : 'run';
+    const actualParams = typeof method === 'string' ? params : [String(method), params];
+
+    const promise = worker.exec<T>(actualMethod, actualParams, resolver as unknown as Resolver<T>, options);
+
+    // Add completion tracking
+    const self = this;
+    promise.then(
+      (result) => {
+        const duration = Date.now() - startTime;
+        self._onTaskComplete(taskId, duration, result, options?.estimatedSize);
+        if (self._circuitOptions.enabled) {
+          self._circuitOnSuccess();
+        }
+        return result;
+      },
+      (error: unknown) => {
+        const duration = Date.now() - startTime;
+        self._onTaskError(taskId, error as Error, duration, options?.estimatedSize);
+        if (self._circuitOptions.enabled) {
+          self._circuitOnError();
+        }
+        throw error;
+      }
+    );
   }
 
   /**
@@ -1012,9 +1126,23 @@ export class Pool<TMetadata = unknown> {
 
       if (worker) {
         const me = this;
-        const task = this.taskQueue.pop();
+        const task = this.taskQueue.pop() as (Task<TMetadata> & { taskId?: number; startTime?: number }) | undefined;
 
         if (task && task.resolver.promise.pending) {
+          // Track which worker is executing this task
+          const workerIndex = this.workers.indexOf(worker);
+          if (task.taskId !== undefined) {
+            this._taskWorkerMap.set(task.taskId, workerIndex);
+
+            // Emit taskStart event now that we know the worker
+            this._emit('taskStart', {
+              taskId: task.taskId,
+              method: (task as { method: string }).method,
+              workerIndex,
+              timestamp: Date.now(),
+            });
+          }
+
           const promise = worker
             .exec(task.method as string, task.params, task.resolver, task.options)
             .then(me._boundNext)
@@ -1051,7 +1179,15 @@ export class Pool<TMetadata = unknown> {
     // Create new worker if under limit
     if (this.workers.length < this.maxWorkers) {
       const worker = this._createWorkerHandler();
+      const workerIndex = this.workers.length;
       this.workers.push(worker);
+
+      // Emit workerSpawn event
+      this._emit('workerSpawn', {
+        workerIndex,
+        timestamp: Date.now(),
+      });
+
       return worker;
     }
 
@@ -1068,6 +1204,9 @@ export class Pool<TMetadata = unknown> {
       DEBUG_PORT_ALLOCATOR.releasePort(worker.debugPort);
     }
 
+    // Get worker index before removing from list
+    const workerIndex = this.workers.indexOf(worker);
+
     this._removeWorkerFromList(worker);
     this._ensureMinWorkers();
 
@@ -1080,6 +1219,15 @@ export class Pool<TMetadata = unknown> {
           workerOpts: worker.workerOpts || {},
           script: worker.script,
         });
+
+        // Emit workerExit event
+        if (workerIndex !== -1) {
+          me._emit('workerExit', {
+            workerIndex,
+            code: undefined,
+            timestamp: Date.now(),
+          });
+        }
 
         if (err) {
           reject(err);
@@ -1140,7 +1288,7 @@ export class Pool<TMetadata = unknown> {
     const promises: Array<WorkerpoolPromise<unknown, unknown>> = [];
     const workers = this.workers.slice();
 
-    workers.forEach((worker) => {
+    workers.forEach((worker, workerIndex) => {
       const termPromise = worker
         .terminateAndNotify(force, timeout)
         .then(removeWorker)
@@ -1151,6 +1299,13 @@ export class Pool<TMetadata = unknown> {
             workerThreadOpts: worker.workerThreadOpts || {},
             workerOpts: worker.workerOpts || {},
             script: worker.script,
+          });
+
+          // Emit workerExit event
+          me._emit('workerExit', {
+            workerIndex,
+            code: undefined,
+            timestamp: Date.now(),
           });
         });
 
@@ -1185,7 +1340,14 @@ export class Pool<TMetadata = unknown> {
   private _ensureMinWorkers(): void {
     if (this.minWorkers) {
       for (let i = this.workers.length; i < this.minWorkers; i++) {
+        const workerIndex = this.workers.length;
         this.workers.push(this._createWorkerHandler());
+
+        // Emit workerSpawn event
+        this._emit('workerSpawn', {
+          workerIndex,
+          timestamp: Date.now(),
+        });
       }
     }
   }
@@ -1344,8 +1506,13 @@ export class Pool<TMetadata = unknown> {
       this._estimatedQueueMemory = Math.max(0, this._estimatedQueueMemory - estimatedSize);
     }
 
+    // Get and clean up worker tracking
+    const workerIndex = this._taskWorkerMap.get(taskId) ?? -1;
+    this._taskWorkerMap.delete(taskId);
+
     this._emit('taskComplete', {
       taskId,
+      workerIndex,
       duration,
       result,
       timestamp: Date.now(),
@@ -1360,8 +1527,13 @@ export class Pool<TMetadata = unknown> {
       this._estimatedQueueMemory = Math.max(0, this._estimatedQueueMemory - estimatedSize);
     }
 
+    // Get and clean up worker tracking
+    const workerIndex = this._taskWorkerMap.get(taskId) ?? -1;
+    this._taskWorkerMap.delete(taskId);
+
     this._emit('taskError', {
       taskId,
+      workerIndex,
       error,
       duration,
       timestamp: Date.now(),
