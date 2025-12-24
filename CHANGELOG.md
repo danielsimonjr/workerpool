@@ -9,6 +9,22 @@ This is a fork of [josdejong/workerpool](https://github.com/josdejong/workerpool
 
 ## [Unreleased]
 
+### Removed
+- **Dead Code Cleanup**: Removed 6 orphaned/duplicate modules after comprehensive audit:
+  - `core/simd-processor.ts` - Misleading: claimed "SIMD-accelerated" but was just regular JS loops
+  - `wasm/simd-processor.ts` - Duplicate of core version
+  - `platform/structured-clone.ts` - Overlaps with `auto-transfer.ts` functionality
+  - `workers/health-monitor.ts` - Overlaps with `core/heartbeat.ts` (HeartbeatMonitor)
+  - `workers/recycler.ts` - Overlaps with WorkerCache recycling functionality
+  - `workers/affinity.ts` - Overlaps with `core/task-affinity.ts` (used by AdvancedPool)
+- **Test Cleanup**: Removed `test/ts/simd-processor.vitest.ts` (tested removed module)
+
+### Added
+- **Codebase Audit Documentation** (`docs/UNINTEGRATED_MODULES.md`):
+  - Comprehensive audit of all TypeScript modules
+  - Categorized modules: Fully integrated, High-value to integrate, Optional/Advanced, WASM
+  - Clear integration roadmap for HeartbeatMonitor, FunctionCache, KWayMerge, AutoTransfer
+
 ### Fixed
 - **WASM Memory Page Calculation**: Fixed critical bug where JavaScript's `calculateMemoryPages()` didn't match WASM's power-of-2 rounding, causing "memory access out of bounds" errors at capacity 50K+
 - **WASM Capacity Validation**: Added `MAX_WASM_CAPACITY` (131072) constant and validation to prevent exceeding WASM module's 256-page limit

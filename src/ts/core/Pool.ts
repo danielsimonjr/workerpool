@@ -504,7 +504,7 @@ export class Pool<TMetadata = unknown> {
     if (this._circuitOptions.enabled && this._circuitState === 'open') {
       const error = new Error('Circuit breaker is open');
       error.name = 'CircuitBreakerError';
-      return WorkerpoolPromise.reject(error) as unknown as WorkerpoolPromise<T, Error>;
+      return WorkerpoolPromise.reject<T, Error>(error);
     }
 
     // Check memory pressure
@@ -521,7 +521,7 @@ export class Pool<TMetadata = unknown> {
         if (this._memoryOptions.onMemoryPressure === 'reject') {
           const error = new Error('Queue memory limit exceeded');
           error.name = 'MemoryPressureError';
-          return WorkerpoolPromise.reject(error) as unknown as WorkerpoolPromise<T, Error>;
+          return WorkerpoolPromise.reject<T, Error>(error);
         }
       }
       this._estimatedQueueMemory = newEstimate;

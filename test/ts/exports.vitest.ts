@@ -306,10 +306,6 @@ describe('Export Verification', () => {
         expect(typeof full.AdaptiveScaler).toBe('function');
       });
 
-      it('should export HealthMonitor class', () => {
-        expect(typeof full.HealthMonitor).toBe('function');
-      });
-
       it('should export WorkerCache class', () => {
         expect(typeof full.WorkerCache).toBe('function');
       });

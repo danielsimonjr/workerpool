@@ -561,41 +561,6 @@ export type {
   AdaptiveScalerOptions,
 } from './workers/adaptive-scaler';
 
-// Health Monitor - Worker health tracking
-export {
-  HealthMonitor,
-  HealthStatus,
-} from './workers/health-monitor';
-
-export type {
-  WorkerHealthCheck,
-  HealthMonitorOptions,
-} from './workers/health-monitor';
-
-// Idle Recycler - Worker recycling based on idle time
-export {
-  IdleRecycler,
-  RecycleReason,
-} from './workers/recycler';
-
-export type {
-  RecycleCandidate,
-  IdleRecyclerOptions,
-} from './workers/recycler';
-
-// Worker Affinity - Task-to-worker affinity for cache locality
-export {
-  WorkerAffinity,
-  AffinityStrategy,
-} from './workers/affinity';
-
-export type {
-  AffinityHint,
-  AffinityMapping,
-  WorkerAffinityOptions,
-  AffinityStats,
-} from './workers/affinity';
-
 // Worker Cache - Worker instance caching
 export {
   WorkerCache,
@@ -637,19 +602,6 @@ export type {
   SendResult as ChannelSendResult,
   ChannelFactoryOptions,
 } from './platform/channel-factory';
-
-// Structured Clone Optimization
-export {
-  optimizeForTransfer,
-  hasTransferableContent,
-  createOptimizedTransfer,
-  CloneStrategy,
-} from './platform/structured-clone';
-
-export type {
-  CloneOptimization,
-  CloneOptions,
-} from './platform/structured-clone';
 
 // Result Stream - Streaming large results
 export {
@@ -699,56 +651,6 @@ export type {
   SerializedBatchResult,
   SerializerConfig,
 } from './core/batch-serializer';
-
-// SIMD Processor - SIMD-accelerated operations
-export {
-  getSIMDProcessor,
-  canUseSIMD,
-  simdMapF32,
-  simdReduceF32,
-  simdDotProduct,
-  resetSIMDProcessor,
-} from './wasm/simd-processor';
-
-export type {
-  SIMDProcessor,
-  SIMDOperation,
-  ReduceOperation,
-} from './wasm/simd-processor';
-
-// TypeScript SIMD-like utilities (fallback when WASM unavailable)
-export {
-  isNumericArray,
-  isFloat32Array,
-  isFloat64Array,
-  isInt32Array,
-  hasSIMDSupport,
-  simdSumF32,
-  simdMinF32,
-  simdMaxF32,
-  simdMultiplyF32,
-  simdAddF32,
-  simdSquareF32,
-  simdSqrtF32,
-  simdDotProductF32,
-  simdCountF32,
-  simdIndexOfF32,
-  simdIncludesF32,
-  simdCountGreaterThanF32,
-  simdCountLessThanF32,
-  simdSumI32,
-  simdCountI32,
-  simdIndexOfI32,
-  SIMDProcessor as TypeScriptSIMDProcessor,
-  createNumericReducer,
-  defaultSIMDProcessor,
-} from './core/simd-processor';
-
-export type {
-  SIMDOperation as TSSimdOperation,
-  NumericArray,
-  SIMDProcessorOptions,
-} from './core/simd-processor';
 
 // Function Caching - Optimizes repeated function compilation
 export {

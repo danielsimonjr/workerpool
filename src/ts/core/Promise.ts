@@ -332,18 +332,22 @@ export class WorkerpoolPromise<T, E = Error> implements IWorkerpoolPromise<T, E>
 
   /**
    * Create a promise that resolves with the given value
+   * @template T The type of the resolved value
+   * @template E The error type (defaults to never for resolved promises)
    */
-  static resolve<T>(value: T | PromiseLike<T>): WorkerpoolPromise<T, never> {
-    return new WorkerpoolPromise<T, never>((resolve) => {
+  static resolve<T, E = never>(value: T | PromiseLike<T>): WorkerpoolPromise<T, E> {
+    return new WorkerpoolPromise<T, E>((resolve) => {
       resolve(value as T);
     });
   }
 
   /**
    * Create a promise that rejects with the given error
+   * @template T The type that would be resolved (allows type inference)
+   * @template E The error type (defaults to Error)
    */
-  static reject<E = Error>(error: E): WorkerpoolPromise<never, E> {
-    return new WorkerpoolPromise<never, E>((_, reject) => {
+  static reject<T = never, E = Error>(error: E): WorkerpoolPromise<T, E> {
+    return new WorkerpoolPromise<T, E>((_, reject) => {
       reject(error);
     });
   }
