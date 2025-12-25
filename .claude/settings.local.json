@@ -112,7 +112,16 @@
       "Bash(node benchmark.mjs:*)",
       "Bash(bun quick-bench.mjs)",
       "Bash(tasklist:*)",
-      "Bash(npm run build:wasm:*)"
+      "Bash(npm run build:wasm:*)",
+      "Bash(timeout 60 npx tsx:*)",
+      "Bash(timeout 90 npx tsx:*)",
+      "Bash(timeout 30 npx tsx:*)",
+      "Bash(timeout 30 node:*)",
+      "Bash(npm test)",
+      "Bash(timeout 120 npx mocha:*)",
+      "Bash(timeout 180 npx mocha:*)",
+      "Bash(timeout 60 node:*)",
+      "Bash(timeout 300 npm test:*)"
     ],
     "deny": [],
     "ask": []
