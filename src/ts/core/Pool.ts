@@ -15,8 +15,8 @@
  */
 
 import { WorkerpoolPromise } from './Promise';
-import { WorkerHandler, ensureWorkerThreads, TerminateError } from './WorkerHandler';
-import type { WorkerHandlerOptions, WorkerType } from './WorkerHandler';
+import { WorkerHandler, ensureWorkerThreads, TerminateError, HEARTBEAT_METHOD_ID } from './WorkerHandler';
+import type { WorkerHandlerOptions, WorkerType, HeartbeatResponseMessage } from './WorkerHandler';
 import { cpus } from '../platform/environment';
 import { FIFOQueue, LIFOQueue, createQueue } from './TaskQueue';
 import { DebugPortAllocator } from './debug-port-allocator';
@@ -59,6 +59,9 @@ import {
 } from './parallel-processing';
 import { SessionManager, type SessionManagerPool } from './session-manager';
 import type { Session, SessionOptions } from '../types/session';
+import { HeartbeatMonitor, type HeartbeatConfig } from './heartbeat';
+import type { HeartbeatRequest, HeartbeatResponse } from '../types/messages';
+import { autoDetectTransfer, type AutoTransferOptions } from './auto-transfer';
 
 /** Global debug port allocator */
 const DEBUG_PORT_ALLOCATOR = new DebugPortAllocator();
@@ -179,6 +182,8 @@ export interface EnhancedPoolOptions extends PoolOptions {
   eagerInit?: boolean;
   /** Default data transfer strategy */
   dataTransfer?: DataTransferStrategy;
+  /** Auto-transfer options (used when dataTransfer is 'auto') */
+  autoTransfer?: AutoTransferOptions;
   /** Retry options */
   retry?: RetryOptions;
   /** Circuit breaker options */
@@ -323,9 +328,13 @@ export class Pool<TMetadata = unknown> {
   /** Health checks */
   private _healthCheckTimer: ReturnType<typeof setInterval> | null = null;
   private _healthCheckOptions: Required<HealthCheckOptions>;
+  private _heartbeatMonitor: HeartbeatMonitor | null = null;
 
   /** Data transfer strategy */
   private _dataTransfer: DataTransferStrategy;
+
+  /** Auto-transfer options for automatic transferable detection */
+  private _autoTransferOptions: AutoTransferOptions;
 
   /** Task tracking */
   private _taskIdCounter = 0;
@@ -437,6 +446,14 @@ export class Pool<TMetadata = unknown> {
     // Initialize data transfer strategy
     this._dataTransfer = options.dataTransfer ?? 'auto';
 
+    // Initialize auto-transfer options (used when dataTransfer is 'auto')
+    this._autoTransferOptions = options.autoTransfer ?? {
+      minTransferSize: 1024,  // 1KB minimum to trigger auto-transfer
+      maxDepth: 10,           // Max depth for nested object search
+      transferNested: true,   // Search nested objects for transferables
+      transferShared: false,  // Don't transfer SharedArrayBuffers by default
+    };
+
     // Start health checks if enabled
     if (this._healthCheckOptions.enabled) {
       this._startHealthChecks();
@@ -498,6 +515,19 @@ export class Pool<TMetadata = unknown> {
   ): WorkerpoolPromise<T, Error> {
     if (params && !Array.isArray(params)) {
       throw new TypeError('Array expected as argument "params"');
+    }
+
+    // Auto-detect transferables when dataTransfer is 'auto'
+    const effectiveStrategy = options?.dataTransfer ?? this._dataTransfer;
+    if (effectiveStrategy === 'auto' && params && (!options?.transfer || options.transfer.length === 0)) {
+      const transferResult = autoDetectTransfer(params, this._autoTransferOptions);
+      if (transferResult.shouldTransfer && transferResult.transferables.length > 0) {
+        // Clone options to avoid mutating the original
+        options = {
+          ...options,
+          transfer: transferResult.transferables,
+        };
+      }
     }
 
     // Check circuit breaker
@@ -671,6 +701,18 @@ export class Pool<TMetadata = unknown> {
     options: EnhancedExecOptions<T> | undefined,
     resolver: Resolver<T>
   ): void {
+    // Auto-detect transferables when dataTransfer is 'auto'
+    const effectiveStrategy = options?.dataTransfer ?? this._dataTransfer;
+    if (effectiveStrategy === 'auto' && params && (!options?.transfer || options.transfer.length === 0)) {
+      const transferResult = autoDetectTransfer(params, this._autoTransferOptions);
+      if (transferResult.shouldTransfer && transferResult.transferables.length > 0) {
+        options = {
+          ...options,
+          transfer: transferResult.transferables,
+        };
+      }
+    }
+
     const taskId = ++this._taskIdCounter;
     const startTime = Date.now();
 
@@ -711,7 +753,12 @@ export class Pool<TMetadata = unknown> {
         }
         throw error;
       }
-    );
+    ).finally(() => {
+      // Process any pending tasks in the queue
+      // This is critical: when execOnWorker bypasses the queue,
+      // we still need to trigger queue processing after completion
+      self._next();
+    });
   }
 
   /**
@@ -1260,6 +1307,12 @@ export class Pool<TMetadata = unknown> {
       this._healthCheckTimer = null;
     }
 
+    // Stop HeartbeatMonitor
+    if (this._heartbeatMonitor) {
+      this._heartbeatMonitor.stop();
+      this._heartbeatMonitor = null;
+    }
+
     // Stop circuit breaker timer
     if (this._circuitResetTimer) {
       clearTimeout(this._circuitResetTimer);
@@ -1356,6 +1409,7 @@ export class Pool<TMetadata = unknown> {
    * Create a new worker handler
    */
   private _createWorkerHandler(): WorkerHandler {
+    const self = this;
     const overriddenParams =
       this.onCreateWorker({
         forkArgs: [...this.forkArgs],
@@ -1374,6 +1428,21 @@ export class Pool<TMetadata = unknown> {
       workerType: this.workerType,
       workerTerminateTimeout: this.workerTerminateTimeout,
       emitStdStreams: this.emitStdStreams,
+      // Pass heartbeat response handler for HeartbeatMonitor integration
+      onHeartbeatResponse: this._healthCheckOptions?.enabled
+        ? (workerId: string, response: HeartbeatResponseMessage) => {
+            // Convert HeartbeatResponseMessage to HeartbeatResponse format
+            const heartbeatResponse: HeartbeatResponse = {
+              id: response.id,
+              method: HEARTBEAT_METHOD_ID,
+              status: response.status,
+              taskCount: response.taskCount,
+              memoryUsage: response.memoryUsage,
+              uptime: response.uptime,
+            };
+            self._handleHeartbeatResponse(workerId, heartbeatResponse);
+          }
+        : undefined,
     };
 
     return new WorkerHandler(
@@ -1618,31 +1687,93 @@ export class Pool<TMetadata = unknown> {
   // ============================================================================
 
   /**
-   * Start health check interval
+   * Start health check interval using HeartbeatMonitor
    */
   private _startHealthChecks(): void {
-    this._healthCheckTimer = setInterval(() => {
-      this._runHealthCheck();
-    }, this._healthCheckOptions.interval);
+    const self = this;
+
+    // Create HeartbeatMonitor with sendHeartbeat callback
+    this._heartbeatMonitor = new HeartbeatMonitor(
+      (workerId: string, request: HeartbeatRequest) => {
+        // Find the worker by ID
+        const worker = self.workers.find(w => w.id === workerId);
+        if (worker && worker.worker) {
+          // Forward the heartbeat request to the worker
+          worker.worker.send({
+            id: request.id,
+            method: HEARTBEAT_METHOD_ID,
+            workerId: request.workerId,
+          });
+        }
+      },
+      {
+        interval: this._healthCheckOptions.interval,
+        timeout: this._healthCheckOptions.timeout,
+        maxMissed: 3, // Consider unresponsive after 3 missed heartbeats
+        autoRecover: this._healthCheckOptions.action !== 'warn',
+        onUnresponsive: (workerId: string, missedCount: number) => {
+          self._handleUnresponsiveWorker(workerId, missedCount);
+        },
+        onRecovered: (workerId: string) => {
+          // Worker recovered - no action needed, just log if needed
+        },
+      }
+    );
+
+    // Register existing workers
+    for (const worker of this.workers) {
+      this._heartbeatMonitor.registerWorker(worker.id);
+    }
+
+    // Start monitoring
+    this._heartbeatMonitor.start();
   }
 
   /**
-   * Run health check
+   * Handle unresponsive worker detected by HeartbeatMonitor
    */
-  private _runHealthCheck(): void {
-    const self = this;
-    const promise = this.exec('methods');
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
-        reject(new Error('Health check timeout'));
-      }, self._healthCheckOptions.timeout);
-    });
+  private _handleUnresponsiveWorker(workerId: string, missedCount: number): void {
+    const workerIndex = this.workers.findIndex(w => w.id === workerId);
+    if (workerIndex === -1) return;
 
-    Promise.race([promise, timeoutPromise]).catch((error) => {
-      if (self._healthCheckOptions.action === 'warn') {
-        console.warn('[workerpool] Health check failed:', error);
-      }
-    });
+    const worker = this.workers[workerIndex];
+
+    switch (this._healthCheckOptions.action) {
+      case 'warn':
+        console.warn(`[workerpool] Worker ${workerId} unresponsive (${missedCount} missed heartbeats)`);
+        break;
+
+      case 'remove':
+        console.warn(`[workerpool] Removing unresponsive worker ${workerId}`);
+        this._heartbeatMonitor?.unregisterWorker(workerId);
+        worker.terminate(true);
+        this.workers.splice(workerIndex, 1);
+        this._emit('workerExit', { workerIndex, code: undefined, timestamp: Date.now() });
+        break;
+
+      case 'restart':
+      default:
+        console.warn(`[workerpool] Restarting unresponsive worker ${workerId}`);
+        this._heartbeatMonitor?.unregisterWorker(workerId);
+        worker.terminate(true, () => {
+          // Create a new worker to replace the terminated one
+          const newWorker = this._createWorkerHandler();
+          this.workers[workerIndex] = newWorker;
+          this._heartbeatMonitor?.registerWorker(newWorker.id);
+          this._emit('workerSpawn', { workerIndex, timestamp: Date.now() });
+        });
+        break;
+    }
+  }
+
+  /**
+   * Handle heartbeat response from worker
+   * This should be called when a heartbeat response message is received
+   */
+  private _handleHeartbeatResponse(workerId: string, response: HeartbeatResponse): void {
+    if (this._heartbeatMonitor) {
+      this._heartbeatMonitor.handleResponse(workerId, response);
+    }
   }
 
   // ============================================================================

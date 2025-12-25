@@ -30,6 +30,9 @@ export const TERMINATE_METHOD_ID = '__workerpool-terminate__';
 /** Special message to trigger cleanup before potential termination */
 export const CLEANUP_METHOD_ID = '__workerpool-cleanup__';
 
+/** Special message for heartbeat health checks */
+export const HEARTBEAT_METHOD_ID = '__workerpool-heartbeat__';
+
 /**
  * Extended Worker interface for browser workers with Node.js-like API
  */
@@ -106,6 +109,18 @@ export interface WorkerHandlerOptions {
   debugPort?: number;
   workerTerminateTimeout?: number;
   emitStdStreams?: boolean;
+  /** Callback for heartbeat responses (used by Pool's HeartbeatMonitor) */
+  onHeartbeatResponse?: (workerId: string, response: HeartbeatResponseMessage) => void;
+}
+
+/** Heartbeat response message structure */
+export interface HeartbeatResponseMessage {
+  id: number;
+  method: string;
+  status: 'alive' | 'busy' | 'idle';
+  taskCount?: number;
+  memoryUsage?: number;
+  uptime?: number;
 }
 
 /**
@@ -464,6 +479,12 @@ function handleEmittedStdPayload(
  * WorkerHandler - Controls a single worker
  */
 export class WorkerHandler {
+  /** Global counter for unique worker IDs */
+  private static _nextId = 0;
+
+  /** Unique identifier for this worker handler */
+  readonly id: string;
+
   /** Path to worker script */
   readonly script: string;
 
@@ -487,6 +508,9 @@ export class WorkerHandler {
 
   /** Timeout for worker termination */
   readonly workerTerminateTimeout: number;
+
+  /** Callback for heartbeat responses */
+  private onHeartbeatResponse?: (workerId: string, response: HeartbeatResponseMessage) => void;
 
   /** Queue of requests waiting for worker ready - O(1) operations */
   private requestQueue: GrowableCircularBuffer<QueuedRequest> = new GrowableCircularBuffer(8);
@@ -514,6 +538,7 @@ export class WorkerHandler {
   private lastId = 0;
 
   constructor(script?: string, options: WorkerHandlerOptions = {}) {
+    this.id = `worker-${WorkerHandler._nextId++}`;
     this.script = script || getDefaultWorker();
     this.worker = setupWorker(this.script, options);
     this.debugPort = options.debugPort;
@@ -522,6 +547,7 @@ export class WorkerHandler {
     this.workerOpts = options.workerOpts;
     this.workerThreadOpts = options.workerThreadOpts;
     this.workerTerminateTimeout = options.workerTerminateTimeout || 1000;
+    this.onHeartbeatResponse = options.onHeartbeatResponse;
 
     // Default script doesn't send ready message
     if (!script) {
@@ -557,6 +583,12 @@ export class WorkerHandler {
         worker.ready = true;
         me.dispatchQueuedRequests();
       } else {
+        // Check for heartbeat response
+        const msg = response as Record<string, unknown>;
+        if (msg && msg.method === HEARTBEAT_METHOD_ID && me.onHeartbeatResponse) {
+          me.onHeartbeatResponse(me.id, response as HeartbeatResponseMessage);
+          return;
+        }
         me.handleMessage(response as TaskSuccessResponse | TaskErrorResponse | WorkerEvent | CleanupResponse);
       }
     });

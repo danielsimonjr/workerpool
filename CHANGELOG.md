@@ -20,12 +20,51 @@ This is a fork of [josdejong/workerpool](https://github.com/josdejong/workerpool
 - **Test Cleanup**: Removed `test/ts/simd-processor.vitest.ts` (tested removed module)
 
 ### Added
+- **HeartbeatMonitor Integration** (Priority 1 from audit roadmap):
+  - Integrated `HeartbeatMonitor` into `Pool.ts` to replace basic health check interval
+  - Added heartbeat response handling to `worker.ts` for `__workerpool-heartbeat__` messages
+  - Added `HEARTBEAT_METHOD_ID` export to `WorkerHandler.ts`
+  - Added unique `id` property to `WorkerHandler` for HeartbeatMonitor tracking
+  - Added `onHeartbeatResponse` callback option to `WorkerHandlerOptions`
+  - Pool now registers/unregisters workers with HeartbeatMonitor automatically
+  - Pool handles unresponsive workers based on `healthCheck.action` option ('warn', 'remove', 'restart')
+  - Workers respond with `status: 'alive'` and optional `memoryUsage` stats
+- **FunctionCache Integration** (Priority 2 from audit roadmap):
+  - Integrated `FunctionCache` into `worker.ts` to cache compiled dynamic functions
+  - Worker's `run` method now checks cache before compiling functions with `new Function()`
+  - Uses LRU eviction with 500 max entries and 5MB limit
+  - Eliminates ~100+ μs per eval for repeated function calls (e.g., map/reduce operations)
+- **AutoTransfer Integration** (Priority 3 from audit roadmap):
+  - Integrated `autoDetectTransfer` into `Pool.exec()` for automatic transferable detection
+  - When `dataTransfer: 'auto'` (the default), Pool automatically extracts ArrayBuffers, TypedArrays, ImageBitmaps, etc. from params
+  - Zero-copy transfers are enabled automatically when params contain >1KB of transferable data
+  - Added `autoTransfer` option to `EnhancedPoolOptions` for customizing detection behavior:
+    - `minTransferSize`: Minimum bytes to trigger transfer (default: 1024)
+    - `maxDepth`: Max depth for nested object search (default: 10)
+    - `transferNested`: Search nested objects for transferables (default: true)
+    - `transferShared`: Include SharedArrayBuffers (default: false)
+  - Manual `options.transfer` still takes precedence if explicitly specified
 - **Codebase Audit Documentation** (`docs/UNINTEGRATED_MODULES.md`):
   - Comprehensive audit of all TypeScript modules
   - Categorized modules: Fully integrated, High-value to integrate, Optional/Advanced, WASM
   - Clear integration roadmap for HeartbeatMonitor, FunctionCache, KWayMerge, AutoTransfer
+- **Work-Stealing & Task Affinity Benchmarks** (Priority 4 from audit roadmap):
+  - `benchmark/benchmark.ts`: Comprehensive benchmarks comparing JS/TS/AdvancedPool
+    - Benchmark 5: Worker choice strategy comparison (round-robin, least-busy, least-used, fair-share)
+    - Benchmark 6: Work-stealing impact with imbalanced workloads
+    - Benchmark 7: Task affinity performance with related tasks
+    - Benchmark 9: Data structure micro-benchmarks (WorkStealingDeque, TaskAffinityRouter)
+  - `benchmark/work-stealing-quick.js`: Quick validation benchmark for work-stealing and affinity
+- **KWayMerge Integration** (Priority 5 from audit roadmap):
+  - Integrated `kWayMerge` module into `parallel-processing.ts` for O(n log k) result merging
+  - `createParallelFilter`: Now uses `mergeFilterResults()` instead of O(n log n) sort
+  - `createParallelPartition`: Now uses `mergePartitionResults()` for matches/nonMatches merging
+  - `createParallelGroupBy`: Now uses `mergeGroupByResults()` for per-group ordering
+  - `createParallelUnique`: Now uses `mergeUniqueResults()` for deduplication
+  - Performance benefit: When merging k chunks, O(n log k) vs O(n log n) - significant for k << n
 
 ### Fixed
+- **AdvancedPool Sequential Batch Hanging**: Fixed critical bug where tasks queued via `pool.exec()` would never execute when AdvancedPool used `execOnWorker()` for direct worker assignment. The issue was that `_executeOnWorker()` didn't call `_next()` after task completion, leaving pending queue items stuck. Now `_executeOnWorker()` properly triggers queue processing via `.finally(() => this._next())`.
 - **WASM Memory Page Calculation**: Fixed critical bug where JavaScript's `calculateMemoryPages()` didn't match WASM's power-of-2 rounding, causing "memory access out of bounds" errors at capacity 50K+
 - **WASM Capacity Validation**: Added `MAX_WASM_CAPACITY` (131072) constant and validation to prevent exceeding WASM module's 256-page limit
 - **WASM Queue Integration**: Added `createQueueAsync()` with proper `await` to catch async initialization errors

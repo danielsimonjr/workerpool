@@ -29,6 +29,15 @@ import type { BatchTask, BatchResult } from '../types/index';
 import { WorkerpoolPromise } from './Promise';
 import type { TaskExecutor } from './batch-executor';
 import { createBatchExecutor } from './batch-executor';
+import {
+  kWayMergeIndexed,
+  extractInOrder,
+  mergeFilterResults,
+  mergePartitionResults,
+  mergeGroupByResults,
+  mergeUniqueResults,
+  type IndexedItem,
+} from './k-way-merge';
 
 // =============================================================================
 // Helper Types
@@ -413,21 +422,11 @@ export function createParallelFilter<T>(
         return;
       }
 
-      // Combine all filtered items, maintaining order
-      const allResults: Array<{ item: T; index: number }> = [];
-      for (const chunkResult of result.successes) {
-        for (let i = 0; i < chunkResult.items.length; i++) {
-          allResults.push({
-            item: chunkResult.items[i],
-            index: chunkResult.indices[i],
-          });
-        }
-      }
+      // Use k-way merge for O(n log k) merging instead of O(n log n) sort
+      // mergeFilterResults handles combining and ordering efficiently
+      const mergedItems = mergeFilterResults(result.successes);
 
-      // Sort by original index to maintain order
-      allResults.sort((a, b) => a.index - b.index);
-
-      resolve(allResults.map((r) => r.item));
+      resolve(mergedItems);
     })
     .catch(reject);
 
@@ -995,23 +994,11 @@ export function createParallelPartition<T>(
         return;
       }
 
-      // Combine all results, maintaining order
-      const allMatches: Array<{ item: T; index: number }> = [];
-      const allNonMatches: Array<{ item: T; index: number }> = [];
+      // Use k-way merge for O(n log k) merging instead of O(n log n) sort
+      // mergePartitionResults handles combining matches and nonMatches efficiently
+      const [matches, nonMatches] = mergePartitionResults(result.successes);
 
-      for (const chunkResult of result.successes) {
-        allMatches.push(...chunkResult.matches);
-        allNonMatches.push(...chunkResult.nonMatches);
-      }
-
-      // Sort by original index to maintain order
-      allMatches.sort((a, b) => a.index - b.index);
-      allNonMatches.sort((a, b) => a.index - b.index);
-
-      resolve([
-        allMatches.map((r) => r.item),
-        allNonMatches.map((r) => r.item),
-      ]);
+      resolve([matches, nonMatches]);
     })
     .catch(reject);
 
@@ -1281,26 +1268,9 @@ export function createParallelGroupBy<T, K extends string | number>(
         return;
       }
 
-      // Merge all chunk groups
-      const mergedGroups: Record<K, Array<{ item: T; index: number }>> = {} as Record<K, Array<{ item: T; index: number }>>;
-
-      for (const chunkResult of result.successes) {
-        for (const key of Object.keys(chunkResult.groups) as K[]) {
-          if (!mergedGroups[key]) {
-            mergedGroups[key] = [];
-          }
-          mergedGroups[key].push(...chunkResult.groups[key]);
-        }
-      }
-
-      // Sort each group by original index if preserveOrder is true
-      const finalGroups: Record<K, T[]> = {} as Record<K, T[]>;
-      for (const key of Object.keys(mergedGroups) as K[]) {
-        if (preserveOrder) {
-          mergedGroups[key].sort((a, b) => a.index - b.index);
-        }
-        finalGroups[key] = mergedGroups[key].map((r) => r.item);
-      }
+      // Use k-way merge for O(n log k) merging instead of O(n log n) sort per group
+      // mergeGroupByResults handles combining groups and ordering efficiently
+      const finalGroups = mergeGroupByResults(result.successes, preserveOrder);
 
       resolve(finalGroups);
     })
@@ -1480,27 +1450,9 @@ export function createParallelUnique<T>(
         return;
       }
 
-      // Collect all chunk-unique items with their indices
-      const allItems: Array<{ item: T; index: number }> = [];
-      for (const chunkResult of result.successes) {
-        allItems.push(...chunkResult.items);
-      }
-
-      // Sort by original index
-      allItems.sort((a, b) => a.index - b.index);
-
-      // Deduplicate across chunks (first occurrence wins)
-      const seen = new Set<string>();
-      const uniqueItems: T[] = [];
-
-      for (const { item } of allItems) {
-        const key = keySelector ? keySelector(item) : item;
-        const keyStr = typeof key === 'object' ? JSON.stringify(key) : String(key);
-        if (!seen.has(keyStr)) {
-          seen.add(keyStr);
-          uniqueItems.push(item);
-        }
-      }
+      // Use k-way merge for O(n log k) merging instead of O(n log n) sort
+      // mergeUniqueResults handles combining, ordering, and deduplication efficiently
+      const uniqueItems = mergeUniqueResults(result.successes, keySelector);
 
       resolve(uniqueItems);
     })

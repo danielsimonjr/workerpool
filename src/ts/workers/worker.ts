@@ -8,12 +8,23 @@
 import Transfer from '../platform/transfer';
 import { WorkerpoolPromise } from '../core/Promise';
 import type { SerializedError } from '../types/messages';
+import { FunctionCache, createFunctionKey } from '../core/function-cache';
+
+/** Module-level function cache for compiled dynamic functions */
+const functionCache = new FunctionCache<Function>({
+  maxEntries: 500,  // Cache up to 500 compiled functions
+  maxSize: 5 * 1024 * 1024,  // 5MB max
+  ttl: 0,  // No expiration
+});
 
 /** Special message to terminate worker */
 const TERMINATE_METHOD_ID = '__workerpool-terminate__';
 
 /** Special message to trigger cleanup */
 const CLEANUP_METHOD_ID = '__workerpool-cleanup__';
+
+/** Special message for heartbeat health checks */
+const HEARTBEAT_METHOD_ID = '__workerpool-heartbeat__';
 
 /** Default timeout for abort listeners */
 const TIMEOUT_DEFAULT = 1000;
@@ -216,10 +227,20 @@ function isPromise(value: unknown): value is Promise<unknown> {
 
 /**
  * Built-in run method for dynamic function execution
+ * Uses FunctionCache to avoid repeated compilation of the same function
  */
 worker.methods.run = (function run(fn: string, args: unknown[]): unknown {
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval
-  const f = new Function('return (' + fn + ').apply(this, arguments);') as WorkerMethod;
+  // Check cache first
+  const cacheKey = createFunctionKey(fn);
+  let f = functionCache.get(cacheKey) as WorkerMethod | undefined;
+
+  if (!f) {
+    // Not cached - compile and cache
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+    f = new Function('return (' + fn + ').apply(this, arguments);') as WorkerMethod;
+    functionCache.set(cacheKey, f, fn.length);
+  }
+
   f.worker = publicWorker;
   return f.apply(f, args);
 }) as WorkerMethod;
@@ -380,6 +401,19 @@ worker.on('message', (request: unknown) => {
 
   if (req.method === CLEANUP_METHOD_ID) {
     worker.cleanup(req.id);
+    return;
+  }
+
+  // Handle heartbeat requests - respond immediately with worker status
+  if (req.method === HEARTBEAT_METHOD_ID) {
+    worker.send({
+      id: req.id,
+      method: HEARTBEAT_METHOD_ID,
+      status: 'alive',
+      memoryUsage: typeof process !== 'undefined' && process.memoryUsage
+        ? process.memoryUsage().heapUsed
+        : undefined,
+    });
     return;
   }
 
