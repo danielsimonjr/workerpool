@@ -1,0 +1,87 @@
+{
+  "mcpServers": {
+    "memory-mcp": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["C:/mcp-servers/memory-mcp/src/memory/dist/index.js"],
+      "description": "Enhanced knowledge graph with 45 tools, hierarchical organization",
+      "env": {
+        "MEMORY_FILE_PATH": "C:/mcp-servers/memory-mcp/memory.jsonl"
+      }
+    },
+    "deepthinking-mcp": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["C:/mcp-servers/deepthinking-mcp/dist/index.js"],
+      "description": "Advanced reasoning with 21 modes (v6.0.0), meta-reasoning, taxonomy classifier, visual exports",
+      "env": {}
+    },
+    "everything-mcp": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["C:/mcp-servers/everything-mcp/index.js"],
+      "description": "Windows Everything file search integration (Windows only)",
+      "env": {
+        "ES_PATH": "C:\\Program Files\\Everything\\es.exe"
+      }
+    },
+    "sequential-thinking-mcp": {
+      "type": "stdio",
+      "command": "mcp-server-sequential-thinking",
+      "args": [],
+      "description": "Sequential thinking and iterative reasoning",
+      "env": {}
+    },
+    "math-mcp": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["C:/mcp-servers/math-mcp/dist/index-wasm.js"],
+      "description": "High-performance math with WASM acceleration (up to 1920x speedup)",
+      "env": {
+        "LOG_LEVEL": "info",
+        "ENABLE_WORKERS": "true",
+        "ENABLE_WASM": "true"
+      }
+    },
+    "fermat-mcp": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "--directory",
+        "C:/mcp-servers/fermat-mcp",
+        "run",
+        "server.py"
+      ],
+      "description": "Mathematical computations (NumPy, SymPy, Matplotlib)",
+      "env": {}
+    },
+    "fzf-mcp": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["C:/mcp-servers/fzf-mcp/index.js"],
+      "description": "Fuzzy file finding and filtering (self-contained)",
+      "env": {}
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "playwright-mcp",
+      "args": [],
+      "description": "Browser automation and testing with Playwright",
+      "env": {}
+    },
+    "time": {
+      "type": "stdio",
+      "command": "C:/Users/danie/AppData/Local/Programs/Python/Python314/python.exe",
+      "args": ["-m", "mcp_server_time"],
+      "description": "Time and date utilities server",
+      "env": {}
+    },
+    "windows-mcp": {
+      "type": "stdio",
+      "command": "windows-mcp",
+      "args": [],
+      "description": "Windows UI automation and control tools",
+      "env": {}
+    }
+  }
+}

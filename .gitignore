@@ -35,3 +35,4 @@ tools/create-dependency-graph/create-dependency-graph.exe
 .note.txt
 .claude/settings.local.json
 /.claude
+.mcp.json
