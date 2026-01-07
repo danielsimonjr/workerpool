@@ -9,6 +9,13 @@ This is a fork of [josdejong/workerpool](https://github.com/josdejong/workerpool
 
 ## [Unreleased]
 
+### Added
+- **ESM Module Support for Worker Threads**: Added `'type'` to `workerThreadOptsNames` whitelist, allowing users to pass `workerThreadOpts: { type: 'module' }` for ESM worker support in Node.js 20+
+- **MCP Configuration**: Added `.mcp.json` for Claude Code MCP server integration
+
+### Fixed
+- **Documentation**: Fixed Bun test count in CLAUDE.md (513 → 533) to match README.md
+
 ### Removed
 - **Dead Code Cleanup**: Removed 6 orphaned/duplicate modules after comprehensive audit:
   - `core/simd-processor.ts` - Misleading: claimed "SIMD-accelerated" but was just regular JS loops
