@@ -121,7 +121,10 @@
       "Bash(timeout 120 npx mocha:*)",
       "Bash(timeout 180 npx mocha:*)",
       "Bash(timeout 60 node:*)",
-      "Bash(timeout 300 npm test:*)"
+      "Bash(timeout 300 npm test:*)",
+      "Bash(git fetch:*)",
+      "mcp__memory-mcp__add_tags_to_multiple_entities",
+      "mcp__memory-mcp__get_subtree"
     ],
     "deny": [],
     "ask": []

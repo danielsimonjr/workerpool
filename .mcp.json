@@ -3,10 +3,11 @@
     "memory-mcp": {
       "type": "stdio",
       "command": "node",
-      "args": ["C:/mcp-servers/memory-mcp/src/memory/dist/index.js"],
-      "description": "Enhanced knowledge graph with 45 tools, hierarchical organization",
+      "args": ["C:/mcp-servers/memory-mcp/dist/index.js"],
+      "description": "Enhanced knowledge graph with 55 tools, hierarchical organization, SQLite backend",
       "env": {
-        "MEMORY_FILE_PATH": "C:/mcp-servers/memory-mcp/memory.jsonl"
+        "MEMORY_FILE_PATH": "C:/users/danie/dropbox/github/workerpool/memory.db",
+        "MEMORY_STORAGE_TYPE": "sqlite"
       }
     },
     "deepthinking-mcp": {
@@ -22,7 +23,7 @@
       "args": ["C:/mcp-servers/everything-mcp/index.js"],
       "description": "Windows Everything file search integration (Windows only)",
       "env": {
-        "ES_PATH": "C:\\Program Files\\Everything\\es.exe"
+        "ES_PATH": "C:\Program Files\Everything\es.exe"
       }
     },
     "sequential-thinking-mcp": {
