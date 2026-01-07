@@ -47,5 +47,6 @@ exports.forkOptsNames = [
 // source: https://nodejs.org/api/worker_threads.html#new-workerfilename-options
 exports.workerThreadOptsNames = [
   'argv', 'env', 'eval', 'execArgv', 'stdin', 'stdout', 'stderr', 'workerData',
-  'trackUnmanagedFds', 'transferList', 'resourceLimits', 'name'
+  'trackUnmanagedFds', 'transferList', 'resourceLimits', 'name',
+  'type' // Added for ESM module support (Node.js 20+)
 ]

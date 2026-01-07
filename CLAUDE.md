@@ -341,7 +341,7 @@ Workerpool is **fully compatible** with Bun 1.3.x (TypeScript build only):
 | Worker Threads (`workerType: 'thread'`) | ✅ Full Support | **Recommended for Bun** |
 | Auto Worker Type (`workerType: 'auto'`) | ✅ Full Support | Uses worker_threads |
 | Child Process (`workerType: 'process'`) | ⚠️ Partial | IPC issues in some scenarios |
-| TypeScript Build | ✅ Full Support | All 513 tests pass |
+| TypeScript Build | ✅ Full Support | All 533 tests pass |
 | WASM Support | ✅ Full Support | SharedArrayBuffer, Atomics work |
 
 **Recommended Bun configuration:**

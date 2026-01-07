@@ -108,6 +108,7 @@ export const workerThreadOptsNames = [
   'transferList',
   'resourceLimits',
   'name',
+  'type', // Added for ESM module support (Node.js 20+)
 ] as const;
 
 /**
