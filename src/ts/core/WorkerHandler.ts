@@ -449,11 +449,39 @@ function setupWorker(script: string, options: WorkerHandlerOptions): WorkerInsta
 }
 
 /**
+ * Properties that should never be copied to Error objects
+ * to prevent prototype pollution attacks
+ */
+const DANGEROUS_ERROR_PROPERTIES = new Set([
+  '__proto__',
+  'constructor',
+  'prototype',
+  '__defineGetter__',
+  '__defineSetter__',
+  '__lookupGetter__',
+  '__lookupSetter__',
+]);
+
+/**
  * Convert serialized error back to Error object
+ * Filters dangerous properties to prevent prototype pollution
  */
 function objectToError(obj: SerializedError): Error {
   const error = new Error(obj.message || '');
-  Object.assign(error, obj);
+
+  // Safely copy properties, excluding dangerous ones
+  for (const key of Object.keys(obj)) {
+    if (!DANGEROUS_ERROR_PROPERTIES.has(key)) {
+      // Use Object.defineProperty to avoid triggering setters
+      Object.defineProperty(error, key, {
+        value: obj[key],
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
+    }
+  }
+
   return error;
 }
 

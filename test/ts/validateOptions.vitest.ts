@@ -139,10 +139,13 @@ describe('option name constants', () => {
       expect(workerThreadOptsNames).toContain('workerData');
       expect(workerThreadOptsNames).toContain('resourceLimits');
       expect(workerThreadOptsNames).toContain('name');
+      expect(workerThreadOptsNames).toContain('type'); // ESM module support (Node.js 20+)
     });
 
     it('should have correct number of options', () => {
-      expect(workerThreadOptsNames.length).toBe(12);
+      // 13 options: argv, env, eval, execArgv, stdin, stdout, stderr, workerData,
+      // trackUnmanagedFds, transferList, resourceLimits, name, type (ESM support)
+      expect(workerThreadOptsNames.length).toBe(13);
     });
   });
 

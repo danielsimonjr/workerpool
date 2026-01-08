@@ -344,7 +344,7 @@ worker.register = function (methods, options) {
 
   if (methods) {
     for (var name in methods) {
-      if (methods.hasOwnProperty(name)) {
+      if (Object.prototype.hasOwnProperty.call(methods, name)) {
         worker.methods[name] = methods[name];
         worker.methods[name].worker = publicWorker;
       }

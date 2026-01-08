@@ -203,16 +203,41 @@ function resolveForkOptions(opts) {
 }
 
 /**
+ * Properties that should never be copied to Error objects
+ * to prevent prototype pollution attacks
+ */
+var DANGEROUS_ERROR_PROPERTIES = {
+  '__proto__': true,
+  'constructor': true,
+  'prototype': true,
+  '__defineGetter__': true,
+  '__defineSetter__': true,
+  '__lookupGetter__': true,
+  '__lookupSetter__': true
+};
+
+/**
  * Converts a serialized error to Error
+ * Filters dangerous properties to prevent prototype pollution
  * @param {Object} obj Error that has been serialized and parsed to object
  * @return {Error} The equivalent Error.
  */
 function objectToError (obj) {
-  var temp = new Error('')
+  var temp = new Error(obj.message || '')
   var props = Object.keys(obj)
 
   for (var i = 0; i < props.length; i++) {
-    temp[props[i]] = obj[props[i]]
+    var prop = props[i]
+    // Skip dangerous properties that could pollute prototype
+    if (!DANGEROUS_ERROR_PROPERTIES[prop]) {
+      // Use Object.defineProperty to avoid triggering setters
+      Object.defineProperty(temp, prop, {
+        value: obj[prop],
+        writable: true,
+        enumerable: true,
+        configurable: true
+      })
+    }
   }
 
   return temp

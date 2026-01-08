@@ -128,7 +128,7 @@ function serializeValue(value, ctx) {
   if (typeof value === 'object') {
     var props = {};
     for (var key in value) {
-      if (value.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(value, key)) {
         props[key] = serializeValue(value[key], ctx);
       }
     }
@@ -212,7 +212,7 @@ function deserializeValue(meta, buffers) {
     case TypeCode.OBJECT:
       var obj = {};
       for (var key in meta.properties) {
-        if (meta.properties.hasOwnProperty(key)) {
+        if (Object.prototype.hasOwnProperty.call(meta.properties, key)) {
           obj[key] = deserializeValue(meta.properties[key], buffers);
         }
       }
@@ -316,7 +316,7 @@ function estimateBinarySize(data) {
   if (typeof data === 'object') {
     var objSize = 8;
     for (var key in data) {
-      if (data.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
         objSize += key.length * 2 + estimateBinarySize(data[key]);
       }
     }
@@ -354,7 +354,7 @@ function containsTypedArrays(data) {
 
   if (data && typeof data === 'object') {
     for (var key in data) {
-      if (data.hasOwnProperty(key) && containsTypedArrays(data[key])) {
+      if (Object.prototype.hasOwnProperty.call(data, key) && containsTypedArrays(data[key])) {
         return true;
       }
     }

@@ -9,12 +9,22 @@ This is a fork of [josdejong/workerpool](https://github.com/josdejong/workerpool
 
 ## [Unreleased]
 
+### Security
+- **Prototype Pollution Prevention** (Critical):
+  - Fixed `objectToError()` in both JS and TS `WorkerHandler` to prevent prototype pollution attacks
+  - Now filters dangerous properties (`__proto__`, `constructor`, `prototype`, `__defineGetter__`, `__defineSetter__`, `__lookupGetter__`, `__lookupSetter__`) when reconstructing Error objects from serialized data
+  - Uses `Object.defineProperty()` instead of direct assignment to avoid triggering setters
+- **Safe Property Enumeration**:
+  - Fixed multiple `hasOwnProperty` calls in `binary-serializer.js` and `worker.js` to use safe `Object.prototype.hasOwnProperty.call()` pattern
+  - Prevents bypasses when objects have custom `hasOwnProperty` methods
+
 ### Added
 - **ESM Module Support for Worker Threads**: Added `'type'` to `workerThreadOptsNames` whitelist, allowing users to pass `workerThreadOpts: { type: 'module' }` for ESM worker support in Node.js 20+
 - **MCP Configuration**: Added `.mcp.json` for Claude Code MCP server integration
 
 ### Fixed
 - **Documentation**: Fixed Bun test count in CLAUDE.md (513 → 533) to match README.md
+- **Test Fix**: Updated `validateOptions.vitest.ts` to expect 13 worker thread options (added 'type' for ESM)
 
 ### Removed
 - **Dead Code Cleanup**: Removed 6 orphaned/duplicate modules after comprehensive audit:
