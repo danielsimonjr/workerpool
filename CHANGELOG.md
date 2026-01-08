@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 This is a fork of [josdejong/workerpool](https://github.com/josdejong/workerpool).
 
-## [Unreleased]
+## [10.0.2] - 2025-01-07
 
 ### Security
 - **Prototype Pollution Prevention** (Critical):

@@ -52,8 +52,12 @@ function preserveWasmFiles() {
                     fse.copyFileSync(tempPath, path.join(distDir, file));
                 }
             }
-            // Clean up temp
-            fse.removeSync(tempDir);
+            // Clean up temp (ignore errors - may be locked by file sync)
+            try {
+                fse.removeSync(tempDir);
+            } catch (err) {
+                // Silently ignore - will be cleaned up next build
+            }
         }
     };
 }
