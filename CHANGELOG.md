@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 This is a fork of [josdejong/workerpool](https://github.com/josdejong/workerpool).
 
+## [10.1.0] - 2026-01-11
+
+### Added
+
+- **Dual Module Format**: Added tsup bundler for ESM and CommonJS output
+  - ESM files use `.mjs` extension for explicit ES module format
+  - CJS files use `.js` extension for CommonJS format
+  - Proper `exports` field with `import` and `require` conditions
+- **Build Scripts**:
+  - `build:ts` - tsup bundled build (ESM + CJS)
+  - `build:ts:watch` - tsup watch mode
+  - `build:ts:tsc` - original TypeScript compiler build (preserved)
+  - `build:all` - combined JS (Rollup) and TS (tsup) builds
+
+### Changed
+
+- Updated exports for all modern entry points (`./modern`, `./minimal`, `./full`, `./wasm`, `./errors`, `./debug`) to use proper ESM/CJS conditions
+- TypeScript type definitions now output to `dist/ts/*.d.ts` alongside the bundled code
+
 ## [10.0.2] - 2025-01-07
 
 ### Security

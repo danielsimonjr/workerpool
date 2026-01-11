@@ -1,7 +1,7 @@
 {
   "name": "@danielsimonjr/workerpool",
   "license": "Apache-2.0",
-  "version": "10.0.2",
+  "version": "10.1.0",
   "description": "Offload tasks to a pool of workers on node.js and in the browser",
   "homepage": "https://github.com/danielsimonjr/workerpool",
   "author": "Jos de Jong <wjosdejong@gmail.com> (https://github.com/josdejong)",
@@ -30,33 +30,33 @@
       "browser": "./dist/workerpool.js"
     },
     "./modern": {
-      "types": "./types/ts/index.d.ts",
-      "import": "./dist/ts/index.js",
+      "types": "./dist/ts/index.d.ts",
+      "import": "./dist/ts/index.mjs",
       "require": "./dist/ts/index.js"
     },
     "./minimal": {
-      "types": "./types/ts/minimal.d.ts",
-      "import": "./dist/ts/minimal.js",
+      "types": "./dist/ts/minimal.d.ts",
+      "import": "./dist/ts/minimal.mjs",
       "require": "./dist/ts/minimal.js"
     },
     "./full": {
-      "types": "./types/ts/full.d.ts",
-      "import": "./dist/ts/full.js",
+      "types": "./dist/ts/full.d.ts",
+      "import": "./dist/ts/full.mjs",
       "require": "./dist/ts/full.js"
     },
     "./wasm": {
-      "types": "./types/ts/wasm/index.d.ts",
-      "import": "./dist/ts/wasm/index.js",
+      "types": "./dist/ts/wasm/index.d.ts",
+      "import": "./dist/ts/wasm/index.mjs",
       "require": "./dist/ts/wasm/index.js"
     },
     "./errors": {
-      "types": "./types/ts/errors.d.ts",
-      "import": "./dist/ts/errors.js",
+      "types": "./dist/ts/errors.d.ts",
+      "import": "./dist/ts/errors.mjs",
       "require": "./dist/ts/errors.js"
     },
     "./debug": {
-      "types": "./types/ts/debug.d.ts",
-      "import": "./dist/ts/debug.js",
+      "types": "./dist/ts/debug.d.ts",
+      "import": "./dist/ts/debug.mjs",
       "require": "./dist/ts/debug.js"
     }
   },
@@ -72,9 +72,11 @@
     "build": "node scripts/build-js.mjs",
     "build:js": "node scripts/build-js.mjs",
     "build:js:watch": "node scripts/build-js.mjs --watch",
-    "build:ts": "node scripts/build-js.mjs --ts",
-    "build:ts:watch": "node scripts/build-js.mjs --ts --watch",
+    "build:ts": "tsup",
+    "build:ts:watch": "tsup --watch",
+    "build:ts:tsc": "node scripts/build-js.mjs --ts",
     "build:types": "node scripts/build-js.mjs --types",
+    "build:all": "npm run build:js && npm run build:ts",
     "build:wasm": "npm run build:wasm:embed && npm run build:ts",
     "build:wasm:debug": "node scripts/build-wasm.mjs --debug",
     "build:wasm:esm": "node scripts/build-wasm.mjs --esm",
@@ -120,6 +122,7 @@
     "mocha": "11.7.5",
     "rollup": "4.53.3",
     "tslib": "^2.8.1",
+    "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "5.9.3"
   }
