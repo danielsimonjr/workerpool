@@ -85,199 +85,47 @@ The library provides multiple entry points via `package.json` exports:
 ```
 src/
 ├── js/                    # Legacy JavaScript implementation
-│   ├── index.js           # Public API entry point
-│   ├── Pool.js            # Worker pool management
-│   ├── WorkerHandler.js   # Single worker control
-│   ├── worker.js          # Worker-side code
-│   ├── Promise.js         # Custom Promise with cancel/timeout
-│   ├── queues.js          # Task queue implementations
-│   ├── transfer.js        # Transferable object helpers
-│   ├── environment.js     # Platform detection
-│   ├── capabilities.js    # Runtime capability detection
-│   ├── validateOptions.js # Options validation
-│   ├── worker-url.js      # Worker URL resolution
-│   ├── binary-serializer.js # Binary data serialization
-│   ├── debug-port-allocator.js # Debug port management
-│   ├── types.js           # Type definitions
-│   ├── header.js          # Banner/header for builds
-│   ├── requireFoolWebpack.js # Webpack workaround
-│   └── generated/         # Auto-generated files
-│       └── embeddedWorker.js
+│   ├── index.js, Pool.js, WorkerHandler.js, worker.js  # Core
+│   ├── Promise.js, queues.js, transfer.js               # Utilities
+│   ├── environment.js, capabilities.js                   # Platform
+│   └── generated/embeddedWorker.js                       # Auto-generated
 │
 ├── ts/                    # TypeScript implementation
-│   ├── index.ts           # Main entry (workerpool/modern)
-│   ├── minimal.ts         # Minimal entry (workerpool/minimal)
-│   ├── full.ts            # Full entry (workerpool/full)
-│   ├── errors.ts          # Error class definitions
-│   ├── debug.ts           # Debug/logging utilities
+│   ├── index.ts, minimal.ts, full.ts   # Entry points (modern/minimal/full)
+│   ├── errors.ts, debug.ts             # Error classes & debug utilities
 │   │
-│   ├── core/              # Core pool components
-│   │   ├── Pool.ts            # Type-safe pool implementation
-│   │   ├── WorkerHandler.ts   # Worker lifecycle management
-│   │   ├── Promise.ts         # Typed Promise with cancellation
-│   │   ├── TaskQueue.ts       # Queue interface & implementations
-│   │   ├── validateOptions.ts # Options validation
-│   │   ├── binary-serializer.ts   # Binary data serialization
-│   │   ├── batch-serializer.ts    # Batch operation serialization
-│   │   ├── batch-executor.ts      # Batch task execution
-│   │   ├── metrics.ts         # Performance metrics collection
-│   │   ├── circular-buffer.ts # O(1) circular buffer implementations
-│   │   ├── debug-port-allocator.ts # Debug port management
-│   │   ├── parallel-processing.ts # Parallel array operations (reduce, filter, etc.)
-│   │   ├── main-thread-executor.ts # Graceful degradation fallback
-│   │   ├── session-manager.ts # Worker session management
-│   │   ├── function-cache.ts  # LRU function compilation cache
-│   │   ├── heartbeat.ts       # Worker health monitoring
-│   │   ├── worker-bitmap.ts   # O(1) worker selection bitmap
-│   │   ├── k-way-merge.ts     # K-way merge for parallel results
-│   │   ├── simd-processor.ts  # SIMD operations for numeric arrays
-│   │   └── auto-transfer.ts   # Zero-copy transferables detection
+│   ├── core/              # Pool, WorkerHandler, Promise, TaskQueue, metrics,
+│   │                      # parallel-processing, session-manager, batch-executor,
+│   │                      # heartbeat, worker-bitmap, k-way-merge, simd-processor
 │   │
-│   ├── platform/          # Platform abstraction layer
-│   │   ├── environment.ts     # Node.js vs browser vs Bun detection
-│   │   ├── transfer.ts        # Typed transfer helpers
-│   │   ├── transfer-detection.ts  # Transferable detection
-│   │   ├── capabilities.ts    # Runtime capability detection
-│   │   ├── worker-url.ts      # Worker URL resolution
-│   │   ├── channel-factory.ts # Communication channel factory
-│   │   ├── message-batcher.ts # Message batching utilities
-│   │   ├── result-stream.ts   # Streaming results
-│   │   ├── shared-memory.ts   # SharedArrayBuffer utilities
-│   │   └── structured-clone.ts # Structured clone helpers
+│   ├── platform/          # environment, transfer, capabilities, worker-url,
+│   │                      # channel-factory, message-batcher, shared-memory
 │   │
-│   ├── workers/           # Worker management
-│   │   ├── worker.ts          # Worker-side registration
-│   │   ├── WorkerCache.ts     # Worker instance caching
-│   │   ├── adaptive-scaler.ts # Dynamic worker scaling
-│   │   ├── affinity.ts        # CPU affinity management
-│   │   ├── health-monitor.ts  # Worker health tracking
-│   │   └── recycler.ts        # Worker recycling logic
+│   ├── workers/           # worker, WorkerCache, adaptive-scaler, affinity,
+│   │                      # health-monitor, recycler
 │   │
-│   ├── wasm/              # WebAssembly layer
-│   │   ├── index.ts           # WASM exports
-│   │   ├── WasmBridge.ts      # JS-WASM interop
-│   │   ├── WasmLoader.ts      # WASM loading utilities
-│   │   ├── WasmTaskQueue.ts   # WASM-backed queue
-│   │   ├── EmbeddedWasmLoader.ts  # Embedded WASM loading
-│   │   ├── WasmWorkerTemplate.ts  # WASM worker utilities
-│   │   ├── feature-detection.ts   # WASM capability detection
-│   │   └── simd-processor.ts  # SIMD operations
+│   ├── wasm/              # WasmBridge, WasmLoader, WasmTaskQueue, feature-detection
 │   │
-│   ├── assembly/          # AssemblyScript source (compiled to WASM)
-│   │   ├── index.ts           # WASM module entry
-│   │   ├── priority-queue.ts  # Lock-free priority queue
-│   │   ├── ring-buffer.ts     # Lock-free ring buffer
-│   │   ├── task-slots.ts      # Task slot management
-│   │   ├── atomics.ts         # Atomic operations
-│   │   ├── memory.ts          # Memory management
-│   │   ├── stats.ts           # Statistics tracking
-│   │   ├── errors.ts          # WASM error handling
-│   │   ├── histogram.ts       # Histogram implementation
-│   │   ├── circular-buffer.ts # O(1) circular buffer
-│   │   ├── simd-batch.ts      # SIMD batch operations
-│   │   ├── hash-map.ts        # Lock-free hash map with FNV-1a hash
-│   │   ├── k-way-merge.ts     # K-way merge for sorted arrays
-│   │   ├── binary-protocol.ts # Binary message protocol for WASM
-│   │   ├── tsconfig.json      # AssemblyScript config
-│   │   └── stubs/             # Pure TS stubs for testing
-│   │       ├── index.ts
-│   │       ├── priority-queue.ts
-│   │       ├── ring-buffer.ts
-│   │       ├── task-slots.ts
-│   │       ├── atomics.ts
-│   │       ├── memory.ts
-│   │       ├── stats.ts
-│   │       ├── errors.ts
-│   │       ├── histogram.ts
-│   │       ├── circular-buffer.ts
-│   │       ├── simd-batch.ts
-│   │       ├── hash-map.ts        # TS stub for hash map testing
-│   │       ├── k-way-merge.ts     # TS stub for k-way merge testing
-│   │       └── binary-protocol.ts # TS stub for binary protocol testing
+│   ├── assembly/          # AssemblyScript → WASM (priority-queue, ring-buffer,
+│   │   └── stubs/         # task-slots, atomics, hash-map, binary-protocol, etc.)
 │   │
-│   ├── types/             # TypeScript type definitions
-│   │   ├── index.ts           # Core types export
-│   │   ├── core.ts            # Shared types (ExecOptions, WorkerpoolPromise)
-│   │   ├── internal.ts        # Internal types
-│   │   ├── messages.ts        # Message protocol types (v2 with priority, versioning)
-│   │   ├── error-codes.ts     # Standardized error codes (1xxx-5xxx)
-│   │   ├── worker-methods.ts  # Worker method types
-│   │   ├── parallel.ts        # Parallel processing types (MapperFn, ReducerFn, etc.)
-│   │   └── session.ts         # Session types (Session, SessionOptions, etc.)
-│   │
-│   └── generated/         # Auto-generated files
-│       ├── embeddedWasm.ts    # Embedded WASM bytes
-│       └── wasmTypes.ts       # Generated WASM types
+│   ├── types/             # core.ts, messages.ts, error-codes.ts, parallel.ts, session.ts
+│   └── generated/         # embeddedWasm.ts, wasmTypes.ts
 ```
 
 ### Test Structure
 
 ```
 test/
-├── js/                    # JavaScript tests (mocha)
-│   ├── Pool.test.js           # Pool functionality tests
-│   ├── WorkerHandler.test.js  # Worker handler tests
-│   ├── Promise.test.js        # Promise tests
-│   ├── Queues.test.js         # Queue tests
-│   ├── environment.test.js    # Environment detection tests
-│   ├── wasm.test.js           # WASM functionality tests
-│   ├── debug-port-allocator-test.js # Debug port tests
-│   ├── utils.js               # Test utilities
-│   ├── queues/                # Queue-specific tests
-│   │   └── queue-factory.test.js
-│   ├── forkToKill/            # Fork/kill tests
-│   │   └── common.js
-│   ├── types/                 # TypeScript type tests
-│   │   ├── workerpool-tests.ts
-│   │   └── tsconfig.json
-│   └── workers/               # Test worker scripts
-│       ├── simple.js
-│       ├── async.js
-│       ├── cleanup.js
-│       ├── cleanup-async.js
-│       ├── cleanup-abort.js
-│       ├── crash.js
-│       ├── emit.js
-│       ├── interval.js
-│       ├── console.js
-│       ├── transfer-to.js
-│       ├── transfer-from.js
-│       ├── transfer-emit.js
-│       ├── testIsMainThread.js
-│       └── worker-cache.test.js
+├── js/                    # JavaScript tests (mocha): Pool, WorkerHandler, Promise,
+│   │                      # Queues, environment, wasm, debug-port-allocator
+│   ├── workers/           # Test worker scripts (simple, async, cleanup, crash, etc.)
+│   └── types/             # TypeScript type tests
 │
-└── ts/                    # TypeScript tests (vitest)
-    ├── Pool.vitest.ts         # Pool tests
-    ├── WorkerHandler.vitest.ts # Worker handler tests
-    ├── Promise.vitest.ts      # Promise tests
-    ├── TaskQueue.vitest.ts    # Queue tests
-    ├── transfer.vitest.ts     # Transfer tests
-    ├── environment.vitest.ts  # Environment tests
-    ├── wasm.vitest.ts         # WASM tests
-    ├── circular-buffer.vitest.ts # Circular buffer tests
-    ├── parallel-processing.vitest.ts # Parallel array operations tests
-    ├── main-thread-executor.vitest.ts # Graceful degradation tests
-    ├── session-manager.vitest.ts # Session management tests
-    ├── function-cache.vitest.ts # Function compilation cache tests
-    ├── worker-bitmap.vitest.ts  # Worker selection bitmap tests
-    ├── k-way-merge.vitest.ts    # K-way merge algorithm tests
-    ├── simd-processor.vitest.ts # SIMD processor tests
-    ├── auto-transfer.vitest.ts  # Auto-transfer utilities tests
-    ├── error-codes.vitest.ts    # Standardized error codes tests
-    ├── messages.vitest.ts       # Protocol v2 messages tests
-    ├── heartbeat.vitest.ts      # Heartbeat mechanism tests
-    └── assembly/              # AssemblyScript module tests
-        ├── priority-queue.vitest.ts
-        ├── ring-buffer.vitest.ts
-        ├── task-slots.vitest.ts
-        ├── memory.vitest.ts
-        ├── errors.vitest.ts
-        ├── histogram.vitest.ts
-        ├── circular-buffer.vitest.ts
-        ├── simd-batch.vitest.ts
-        ├── atomics.vitest.ts
-        ├── stats.vitest.ts
-        └── binary-protocol.vitest.ts # Binary protocol tests
+└── ts/                    # TypeScript tests (vitest): Pool, WorkerHandler, Promise,
+    │                      # TaskQueue, transfer, environment, wasm, circular-buffer,
+    │                      # parallel-processing, session-manager, error-codes, etc.
+    └── assembly/          # AssemblyScript module tests (priority-queue, ring-buffer, etc.)
 ```
 
 ### Worker Types
@@ -388,36 +236,10 @@ Located in `scripts/`:
 ## Documentation
 
 The `docs/` directory contains additional documentation:
-
-```
-docs/
-├── architecture/          # Architecture documentation
-│   ├── ARCHITECTURE.md        # High-level architecture
-│   ├── OVERVIEW.md            # System overview
-│   ├── COMPONENTS.md          # Component details
-│   ├── DATAFLOW.md            # Data flow diagrams
-│   └── POOLIFIER_COMPARISON.md # Comparison with poolifier
-│
-├── planning/              # Development planning docs
-│   ├── IMPROVEMENT_PLAN.md    # Improvement roadmap
-│   ├── PHASE_1_SPRINT_*.json  # Phase 1 sprint tracking (1-8)
-│   ├── PHASE_2_SPRINT_*.json  # Phase 2 sprint tracking (1-8)
-│   ├── BATCH_API_DESIGN.md    # Batch API design
-│   ├── LOCK_FREE_QUEUE_PROTOCOL.md
-│   ├── SHARED_MEMORY_PROTOCOL.md
-│   └── PHASE_1_REFACTORING_PLAN.md
-│
-├── BROWSER_SUPPORT.md     # Browser compatibility info
-├── NODE_SUPPORT.md        # Node.js version support
-├── BUN_COMPATIBILITY.md   # Bun runtime compatibility guide
-├── BUN_INTEGRATION_PLAN.md # Bun integration roadmap
-├── LIBRARY_INTEGRATION.md # Integration guide
-├── CODEBASE_EVALUATION.md # Codebase analysis
-├── WORKERPOOL_IMPROVEMENTS.md # Feature improvements
-├── BREAKING_CHANGES.md    # Breaking changes log
-├── MIGRATION_v10_to_v11.md # Migration guide
-└── TS_WASM_OPTIMIZATION_ANALYSIS.md # Performance analysis
-```
+- `architecture/` - High-level architecture, components, data flow, poolifier comparison
+- `planning/` - Improvement roadmap, sprint tracking (Phase 1 & 2), protocol designs
+- Runtime guides: `BROWSER_SUPPORT.md`, `NODE_SUPPORT.md`, `BUN_COMPATIBILITY.md`
+- `BREAKING_CHANGES.md`, `MIGRATION_v10_to_v11.md`, `LIBRARY_INTEGRATION.md`
 
 ## Development Workflow
 
@@ -461,27 +283,7 @@ Remove temporary debug/test artifacts before committing:
 
 ## Examples
 
-The `examples/` directory contains usage examples:
-
-```
-examples/
-├── offloadFunctions.js    # Dynamic function offloading
-├── dedicatedWorker.js     # Dedicated worker setup
-├── proxy.js               # Using worker proxy
-├── async.js               # Async operations
-├── abort.js               # Task cancellation
-├── cleanup.js             # Resource cleanup
-├── consoleCapture.js      # Console output capture
-├── priorityQueue.js       # Priority queue usage
-├── transferableObjects.js # Transferable objects
-├── dynamicOptions.js      # Dynamic pool options
-├── workers/               # Example worker scripts
-├── browser/               # Browser examples
-├── embeddedWorker/        # Embedded worker example
-├── esbuild/               # esbuild integration
-├── vite/                  # Vite integration
-└── webpack5/              # Webpack 5 integration
-```
+The `examples/` directory contains usage examples: offloading functions, dedicated workers, proxy pattern, async, abort/cleanup, priority queues, transferable objects, and bundler integrations (esbuild, vite, webpack5).
 
 ## Performance Benchmarks
 
@@ -516,378 +318,11 @@ If types are out of sync, run `npm run build:types` to regenerate.
 ### Bun child_process Issues
 If using Bun and experiencing IPC timeouts, always use `workerType: 'thread'` instead of `workerType: 'process'`.
 
-## Key APIs
+## API Reference
 
-### Pool Creation
-```javascript
-// Basic pool (auto worker type)
-const pool = workerpool.pool();
-
-// Dedicated worker
-const pool = workerpool.pool(__dirname + '/worker.js');
-
-// With options
-const pool = workerpool.pool({
-  minWorkers: 2,
-  maxWorkers: 4,
-  workerType: 'thread'
-});
-```
-
-### Task Execution
-```javascript
-// Execute function
-const result = await pool.exec((a, b) => a + b, [2, 3]);
-
-// Execute worker method
-const result = await pool.exec('methodName', [args]);
-
-// Batch execution
-const results = await pool.execBatch([
-  ['method1', [arg1]],
-  ['method2', [arg2]]
-]);
-
-// Parallel map
-const results = await pool.map([1, 2, 3], (x) => x * 2);
-
-// Parallel reduce
-const sum = await pool.reduce(
-  [1, 2, 3, 4, 5],
-  (acc, x) => acc + x,
-  (left, right) => left + right,
-  { initialValue: 0 }
-);
-
-// Parallel filter
-const evens = await pool.filter([1, 2, 3, 4, 5], (x) => x % 2 === 0);
-
-// Parallel find
-const found = await pool.find([1, 2, 3, 4, 5], (x) => x > 3);
-
-// Parallel some/every
-const hasEven = await pool.some([1, 2, 3], (x) => x % 2 === 0);
-const allPositive = await pool.every([1, 2, 3], (x) => x > 0);
-
-// Parallel count
-const evenCount = await pool.count([1, 2, 3, 4, 5], (x) => x % 2 === 0);
-
-// Parallel partition
-const [evens, odds] = await pool.partition([1, 2, 3, 4, 5], (x) => x % 2 === 0);
-// evens = [2, 4], odds = [1, 3, 5]
-
-// Parallel groupBy
-const groups = await pool.groupBy(items, (item) => item.type);
-// { typeA: [...], typeB: [...] }
-
-// Parallel flatMap
-const flattened = await pool.flatMap([1, 2, 3], (x) => [x, x * 2]);
-// [1, 2, 2, 4, 3, 6]
-
-// Parallel unique
-const unique = await pool.unique([1, 2, 2, 3, 3, 3]);
-// [1, 2, 3]
-
-// Parallel includes/indexOf
-const hasThree = await pool.includes([1, 2, 3, 4, 5], 3); // true
-const index = await pool.indexOf([1, 2, 3, 4, 5], 3); // 2
-
-// Parallel reduceRight
-const result = await pool.reduceRight(
-  ['a', 'b', 'c'],
-  (acc, x) => acc + x,
-  (left, right) => left + right,
-  { initialValue: '' }
-); // 'cba'
-```
-
-### Worker Registration
-```javascript
-// worker.js
-const workerpool = require('workerpool');
-
-workerpool.worker({
-  myMethod: function(arg) {
-    return arg * 2;
-  }
-});
-```
-
-### Cleanup
-```javascript
-// Graceful termination
-await pool.terminate();
-
-// Force termination
-await pool.terminate(true);
-
-// With timeout
-await pool.terminate(false, 5000);
-```
-
-### Session Support
-```javascript
-// Create a session (worker affinity)
-const session = await pool.createSession({
-  initialState: { count: 0 },
-  timeout: 60000,  // Auto-close after 60s idle
-  maxTasks: 100    // Max tasks before forced close
-});
-
-// Execute tasks on the same worker
-await session.exec('increment', [5]);
-await session.exec('increment', [10]);
-
-// Access session state
-const state = await session.getState();
-await session.setState({ count: 100 });
-
-// Close when done
-await session.close();
-
-// Close all sessions
-await pool.closeSessions();
-```
-
-### Graceful Degradation
-```javascript
-import {
-  MainThreadExecutor,
-  hasWorkerSupport,
-  createPoolWithFallback
-} from 'workerpool/modern';
-
-// Check worker support
-if (!hasWorkerSupport()) {
-  console.log('Workers not available, using main thread');
-}
-
-// Auto-fallback to main thread if workers unavailable
-const pool = createPoolWithFallback(__dirname + '/worker.js');
-
-// Or create executor directly
-const executor = new MainThreadExecutor({
-  methods: {
-    add: (a, b) => a + b,
-    multiply: (a, b) => a * b
-  }
-});
-
-// Same API as Pool
-const result = await executor.exec('add', [2, 3]);
-```
-
-### TypeScript API Exports
-
-The TypeScript builds (`workerpool/minimal`, `workerpool/modern`, `workerpool/full`) export comprehensive APIs for developer integration:
-
-#### Platform Detection (all builds)
-```typescript
-import {
-  platform,              // 'node' | 'browser'
-  isMainThread,          // boolean
-  cpus,                  // number
-  isNode,                // (process: unknown) => boolean
-  getPlatformInfo,       // () => PlatformInfo
-  hasWorkerThreads,      // boolean
-  hasSharedArrayBuffer,  // boolean
-  hasAtomics,            // boolean
-} from 'workerpool/minimal';
-```
-
-#### Bun Compatibility (all builds)
-```typescript
-import {
-  isBun,                    // boolean
-  bunVersion,               // string | null
-  recommendedWorkerType,    // 'auto' | 'thread' | 'process' | 'web'
-  getWorkerTypeSupport,     // () => WorkerTypeSupport
-  isWorkerTypeSupported,    // (type: string) => boolean
-} from 'workerpool/minimal';
-```
-
-#### Data Structures (all builds)
-```typescript
-import {
-  CircularBuffer,         // Fixed-size O(1) circular buffer
-  GrowableCircularBuffer, // Growable circular buffer
-  TimeWindowBuffer,       // Time-based buffer with pruning
-  FIFOQueue,              // First-in-first-out queue
-  LIFOQueue,              // Last-in-first-out queue
-} from 'workerpool/minimal';
-```
-
-#### Transfer Detection (modern/full builds)
-```typescript
-import {
-  isTransferable,         // (value: unknown) => boolean
-  detectTransferables,    // (value: unknown) => DetectionResult
-  getTransferableType,    // (value: unknown) => TransferableType | null
-  validateTransferables,  // (list: Transferable[]) => ValidationResult
-} from 'workerpool/modern';
-```
-
-#### Metrics (modern/full builds)
-```typescript
-import { MetricsCollector } from 'workerpool/modern';
-```
-
-#### Runtime Utilities (modern/full builds)
-```typescript
-import {
-  optimalPool,    // Create pool with optimal settings for current runtime
-  getRuntimeInfo, // Get complete runtime diagnostics
-} from 'workerpool/modern';
-```
-
-#### Parallel Processing (modern/full builds)
-```typescript
-import {
-  // Parallel array operations available on Pool/MainThreadExecutor:
-  // pool.reduce(), pool.filter(), pool.find(), pool.findIndex(),
-  // pool.some(), pool.every(), pool.forEach(), pool.count(),
-  // pool.partition(), pool.groupBy(), pool.flatMap(), pool.unique(),
-  // pool.includes(), pool.indexOf(), pool.reduceRight()
-
-  // Factory functions for creating parallel operations
-  createParallelReduce,
-  createParallelForEach,
-  createParallelFilter,
-  createParallelSome,
-  createParallelEvery,
-  createParallelFind,
-  createParallelFindIndex,
-  createParallelCount,
-  createParallelPartition,
-  createParallelIncludes,
-  createParallelIndexOf,
-  createParallelGroupBy,
-  createParallelFlatMap,
-  createParallelUnique,
-  createParallelReduceRight,
-
-  // Types
-  ParallelOptions,
-  ReduceOptions,
-  FindOptions,
-  PredicateOptions,
-  UniqueOptions,
-  GroupByOptions,
-  FlatMapOptions,
-  ForEachResult,
-  CountResult,
-  PartitionResult,
-  GroupByResult,
-  UniqueResult,
-  MapperFn,
-  ReducerFn,
-  CombinerFn,
-  PredicateFn,
-  ConsumerFn,
-  KeySelectorFn,
-  FlatMapFn,
-  EqualityFn,
-} from 'workerpool/modern';
-```
-
-#### Graceful Degradation (all builds)
-```typescript
-import {
-  MainThreadExecutor,       // Pool-like API for main thread execution
-  hasWorkerSupport,         // Check if workers are available
-  createPoolWithFallback,   // Auto-fallback to main thread
-  mainThreadExecutor,       // Factory function
-} from 'workerpool/minimal';
-```
-
-#### Session Support (modern/full builds)
-```typescript
-import {
-  SessionManager,           // Manages worker sessions
-  // Types
-  Session,
-  SessionOptions,
-  SessionStats,
-  SessionState,
-} from 'workerpool/modern';
-```
-
-#### Full Build Extras
-```typescript
-import {
-  // WASM support
-  canUseWasm, WasmBridge, hasWasmSupport, hasFullWasmSupport,
-  // Debug utilities
-  LogLevel, enableDebug, disableDebug,
-  // Worker management
-  AdaptiveScaler, HealthMonitor, WorkerCache,
-  // Session support
-  SessionManager,
-} from 'workerpool/full';
-```
-
-#### Advanced Pool (modern/full builds)
-```typescript
-import {
-  // AdvancedPool - Pool with intelligent scheduling
-  AdvancedPool,
-  advancedPool,           // Factory with optimal defaults
-  cpuIntensivePool,       // Optimized for CPU-bound tasks
-  ioIntensivePool,        // Optimized for I/O-bound tasks
-  mixedWorkloadPool,      // Optimized for mixed workloads
-
-  // Worker choice strategies
-  RoundRobinStrategy,
-  LeastBusyStrategy,
-  LeastUsedStrategy,
-  FairShareStrategy,
-  WeightedRoundRobinStrategy,
-  InterleavedWeightedRoundRobinStrategy,
-  WorkerChoiceStrategyManager,
-  createStrategy,
-
-  // Work stealing
-  WorkStealingDeque,
-  WorkStealingScheduler,
-  rebalanceTasks,
-
-  // Task affinity
-  TaskAffinityRouter,
-  createAffinityKey,
-  objectAffinityKey,
-
-  // Types
-  AdvancedPoolOptions,
-  AdvancedExecOptions,
-  AdvancedPoolStats,
-  WorkerChoiceStrategy,
-  WorkerSelectionOptions,
-  WorkerStats,
-  StealingPolicy,
-  WorkStealingStats,
-  AffinityKey,
-  RoutingDecision,
-  AffinityRouterOptions,
-} from 'workerpool/modern';
-
-// Usage example
-const pool = advancedPool('./worker.js', {
-  workerChoiceStrategy: 'least-busy',
-  enableWorkStealing: true,
-  stealingPolicy: 'busiest-first',
-  enableTaskAffinity: true,
-});
-
-// Execute with affinity (tasks with same key go to same worker)
-await pool.execWithAffinity('user-123', 'processData', [data]);
-
-// Execute with task type hint (routes to best performer)
-await pool.execWithType('image-processing', 'resize', [image]);
-
-// Change strategy at runtime
-pool.setWorkerChoiceStrategy('fair-share');
-
-// Get advanced statistics
-const stats = pool.stats();
-console.log(stats.workStealingStats?.totalSteals);
-```
+See `docs/` and `examples/` for:
+- Pool creation and task execution patterns
+- TypeScript API exports (`workerpool/minimal`, `workerpool/modern`, `workerpool/full`)
+- Session support and graceful degradation
+- Advanced pool with worker choice strategies and work stealing
+- Parallel array operations (map, reduce, filter, find, etc.)
