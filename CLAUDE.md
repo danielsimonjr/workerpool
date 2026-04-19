@@ -80,6 +80,7 @@ The library provides multiple entry points via `package.json` exports:
 | `workerpool/errors` | Error classes only | `dist/ts/errors.js` |
 | `workerpool/debug` | Debug/logging utilities only | `dist/ts/debug.js` |
 
+<<<<<<< Updated upstream
 ### Source Code Structure
 
 ```
@@ -112,9 +113,20 @@ src/
 │   ├── types/             # core.ts, messages.ts, error-codes.ts, parallel.ts, session.ts
 │   └── generated/         # embeddedWasm.ts, wasmTypes.ts
 ```
+=======
+### Core Components (Legacy JS - `src/*.js`)
+
+The default entry point uses these JavaScript modules:
+- **`index.js`** - Public API. Exports `pool()`, `worker()`, `workerEmit()`, `Transfer`, and utility constants.
+- **`Pool.js`** - Manages worker lifecycle and task queue. Creates `WorkerHandler` instances on demand up to `maxWorkers`. Tasks are queued (FIFO/LIFO/custom) and dispatched to available workers.
+- **`WorkerHandler.js`** - Controls a single worker (child process, worker thread, or web worker). Handles message passing, task execution, timeouts, cancellation, and graceful termination with cleanup.
+- **`worker.js`** - Runs inside the worker process/thread. Receives RPC messages, executes registered methods, handles abort listeners for cleanup before termination.
+- **`Promise.js`** - Custom Promise implementation with `cancel()`, `timeout()`, and `always()` methods.
+>>>>>>> Stashed changes
 
 ### Test Structure
 
+<<<<<<< Updated upstream
 ```
 test/
 ├── js/                    # JavaScript tests (mocha): Pool, WorkerHandler, Promise,
@@ -127,6 +139,43 @@ test/
     │                      # parallel-processing, session-manager, error-codes, etc.
     └── assembly/          # AssemblyScript module tests (priority-queue, ring-buffer, etc.)
 ```
+=======
+Type-safe rewrites used by `workerpool/minimal` and `workerpool/full`:
+- **`Pool.ts`** - Type-safe pool with batch execution (`execBatch`, `map`) and enhanced statistics
+- **`WorkerHandler.ts`** - Worker lifecycle with full typing
+- **`Promise.ts`** - Typed Promise with cancellation
+- **`TaskQueue.ts`** / **`QueueFactory.ts`** - Pluggable queue strategies (FIFO, LIFO, priority)
+- **`batch-executor.ts`** - Batch task execution and parallel map operations
+- **`metrics.ts`** - Performance metrics collection
+
+### Worker Utilities (`src/workers/`)
+
+Advanced worker management:
+- **`adaptive-scaler.ts`** - Dynamic worker count based on load
+- **`health-monitor.ts`** - Worker health checks and automatic recovery
+- **`recycler.ts`** - Worker recycling after task count or memory thresholds
+- **`affinity.ts`** - CPU affinity hints for worker threads
+- **`WorkerCache.ts`** - Caching and reuse of worker instances
+
+### WASM Layer (`src/wasm/` + `assembly/`)
+
+Optional WebAssembly acceleration for lock-free task queues:
+- **`assembly/*.ts`** - AssemblyScript source (priority queue, ring buffer, atomics, SIMD batch)
+- **`WasmBridge.ts`** / **`WasmLoader.ts`** - JavaScript-WASM interop layer
+- **`WasmTaskQueue.ts`** - WASM-backed queue implementation
+- **`EmbeddedWasmLoader.ts`** - Load pre-embedded WASM bytes
+- **`feature-detection.ts`** - Runtime checks for WebAssembly, SharedArrayBuffer, Atomics
+- **`simd-processor.ts`** - SIMD-accelerated batch processing
+
+### Platform Abstraction (`src/platform/`)
+
+- **`environment.ts`** - Detects Node.js vs browser, main thread vs worker
+- **`transfer.ts`** - Typed helpers for transferable objects (ArrayBuffer, TypedArrays, ImageData)
+- **`capabilities.ts`** - Runtime feature detection (SharedArrayBuffer, Atomics, etc.)
+- **`message-batcher.ts`** - Batch multiple messages for efficiency
+- **`shared-memory.ts`** - SharedArrayBuffer utilities
+- **`structured-clone.ts`** - Structured clone polyfills and utilities
+>>>>>>> Stashed changes
 
 ### Worker Types
 
@@ -281,6 +330,7 @@ Remove temporary debug/test artifacts before committing:
 - Runtime artifacts (`.error.txt`, etc.)
 - Check `git status` before committing
 
+<<<<<<< Updated upstream
 ## Examples
 
 The `examples/` directory contains usage examples: offloading functions, dedicated workers, proxy pattern, async, abort/cleanup, priority queues, transferable objects, and bundler integrations (esbuild, vite, webpack5).
@@ -326,3 +376,69 @@ See `docs/` and `examples/` for:
 - Session support and graceful degradation
 - Advanced pool with worker choice strategies and work stealing
 - Parallel array operations (map, reduce, filter, find, etc.)
+=======
+## Development Tools (`tools/`)
+
+### chunking-for-files
+
+Splits large files into editable chunks and merges them back. Useful for editing large files section-by-section.
+
+```bash
+# Split a file into chunks
+bun tools/chunking-for-files/index.ts split <file> [options]
+
+# Merge chunks back
+bun tools/chunking-for-files/index.ts merge <manifest.json>
+
+# Check status of chunks
+bun tools/chunking-for-files/index.ts status <manifest.json>
+```
+
+Supports:
+- **Markdown** - Splits by heading level (##, ###, etc.)
+- **JSON** - Splits by top-level object keys
+- **TypeScript/JavaScript** - Splits by declarations (imports, functions, classes, types, etc.)
+
+### compress-for-context
+
+Compresses files for LLM context windows using format-specific strategies. Reduces token usage when sharing code/docs with AI.
+
+```bash
+npx tsx tools/compress-for-context/compress-for-context.ts <input> [options]
+
+# Options:
+#   -l, --level <lvl>    light | medium | aggressive (default: medium)
+#   -f, --format <fmt>   json | yaml | markdown | csv | typescript | xml | html | auto
+#   -d, --decompress     Restore a .compact file to original
+#   -b, --batch          Process multiple files
+#   --dry-run            Preview without writing
+```
+
+Compression strategies by format:
+- **JSON** - Key abbreviation with legend, minification (~50% savings)
+- **Markdown** - Substring compression, whitespace normalization
+- **TypeScript/JavaScript** - Comment removal, whitespace normalization (~25% savings)
+- **CSV/TSV** - Header and value abbreviation
+
+### create-dependency-graph
+
+Generates comprehensive dependency documentation for the TypeScript codebase.
+
+```bash
+npm run deps                # Quick alias
+npx tsx tools/create-dependency-graph/create-dependency-graph.ts [project-root]
+```
+
+Outputs:
+- `docs/architecture/DEPENDENCY_GRAPH.md` - Human-readable documentation
+- `docs/architecture/dependency-graph.json` - Full machine-readable graph
+- `docs/architecture/dependency-graph.yaml` - Compact YAML (~40% smaller than JSON)
+- `docs/architecture/dependency-summary.compact.json` - CTON-style for LLM consumption (~10KB)
+- `docs/architecture/unused-analysis.md` - Unused files and exports report
+
+Features:
+- Circular dependency detection (distinguishes runtime vs type-only cycles)
+- Unused file and export detection
+- Mermaid diagram generation
+- Statistics (LOC, exports, classes, interfaces, functions, etc.)
+>>>>>>> Stashed changes
