@@ -80,7 +80,6 @@ The library provides multiple entry points via `package.json` exports:
 | `workerpool/errors` | Error classes only | `dist/ts/errors.js` |
 | `workerpool/debug` | Debug/logging utilities only | `dist/ts/debug.js` |
 
-<<<<<<< Updated upstream
 ### Source Code Structure
 
 ```
@@ -113,20 +112,9 @@ src/
 │   ├── types/             # core.ts, messages.ts, error-codes.ts, parallel.ts, session.ts
 │   └── generated/         # embeddedWasm.ts, wasmTypes.ts
 ```
-=======
-### Core Components (Legacy JS - `src/*.js`)
-
-The default entry point uses these JavaScript modules:
-- **`index.js`** - Public API. Exports `pool()`, `worker()`, `workerEmit()`, `Transfer`, and utility constants.
-- **`Pool.js`** - Manages worker lifecycle and task queue. Creates `WorkerHandler` instances on demand up to `maxWorkers`. Tasks are queued (FIFO/LIFO/custom) and dispatched to available workers.
-- **`WorkerHandler.js`** - Controls a single worker (child process, worker thread, or web worker). Handles message passing, task execution, timeouts, cancellation, and graceful termination with cleanup.
-- **`worker.js`** - Runs inside the worker process/thread. Receives RPC messages, executes registered methods, handles abort listeners for cleanup before termination.
-- **`Promise.js`** - Custom Promise implementation with `cancel()`, `timeout()`, and `always()` methods.
->>>>>>> Stashed changes
 
 ### Test Structure
 
-<<<<<<< Updated upstream
 ```
 test/
 ├── js/                    # JavaScript tests (mocha): Pool, WorkerHandler, Promise,
@@ -139,43 +127,6 @@ test/
     │                      # parallel-processing, session-manager, error-codes, etc.
     └── assembly/          # AssemblyScript module tests (priority-queue, ring-buffer, etc.)
 ```
-=======
-Type-safe rewrites used by `workerpool/minimal` and `workerpool/full`:
-- **`Pool.ts`** - Type-safe pool with batch execution (`execBatch`, `map`) and enhanced statistics
-- **`WorkerHandler.ts`** - Worker lifecycle with full typing
-- **`Promise.ts`** - Typed Promise with cancellation
-- **`TaskQueue.ts`** / **`QueueFactory.ts`** - Pluggable queue strategies (FIFO, LIFO, priority)
-- **`batch-executor.ts`** - Batch task execution and parallel map operations
-- **`metrics.ts`** - Performance metrics collection
-
-### Worker Utilities (`src/workers/`)
-
-Advanced worker management:
-- **`adaptive-scaler.ts`** - Dynamic worker count based on load
-- **`health-monitor.ts`** - Worker health checks and automatic recovery
-- **`recycler.ts`** - Worker recycling after task count or memory thresholds
-- **`affinity.ts`** - CPU affinity hints for worker threads
-- **`WorkerCache.ts`** - Caching and reuse of worker instances
-
-### WASM Layer (`src/wasm/` + `assembly/`)
-
-Optional WebAssembly acceleration for lock-free task queues:
-- **`assembly/*.ts`** - AssemblyScript source (priority queue, ring buffer, atomics, SIMD batch)
-- **`WasmBridge.ts`** / **`WasmLoader.ts`** - JavaScript-WASM interop layer
-- **`WasmTaskQueue.ts`** - WASM-backed queue implementation
-- **`EmbeddedWasmLoader.ts`** - Load pre-embedded WASM bytes
-- **`feature-detection.ts`** - Runtime checks for WebAssembly, SharedArrayBuffer, Atomics
-- **`simd-processor.ts`** - SIMD-accelerated batch processing
-
-### Platform Abstraction (`src/platform/`)
-
-- **`environment.ts`** - Detects Node.js vs browser, main thread vs worker
-- **`transfer.ts`** - Typed helpers for transferable objects (ArrayBuffer, TypedArrays, ImageData)
-- **`capabilities.ts`** - Runtime feature detection (SharedArrayBuffer, Atomics, etc.)
-- **`message-batcher.ts`** - Batch multiple messages for efficiency
-- **`shared-memory.ts`** - SharedArrayBuffer utilities
-- **`structured-clone.ts`** - Structured clone polyfills and utilities
->>>>>>> Stashed changes
 
 ### Worker Types
 
@@ -330,7 +281,6 @@ Remove temporary debug/test artifacts before committing:
 - Runtime artifacts (`.error.txt`, etc.)
 - Check `git status` before committing
 
-<<<<<<< Updated upstream
 ## Examples
 
 The `examples/` directory contains usage examples: offloading functions, dedicated workers, proxy pattern, async, abort/cleanup, priority queues, transferable objects, and bundler integrations (esbuild, vite, webpack5).
@@ -376,7 +326,7 @@ See `docs/` and `examples/` for:
 - Session support and graceful degradation
 - Advanced pool with worker choice strategies and work stealing
 - Parallel array operations (map, reduce, filter, find, etc.)
-=======
+
 ## Development Tools (`tools/`)
 
 ### chunking-for-files
@@ -441,4 +391,3 @@ Features:
 - Unused file and export detection
 - Mermaid diagram generation
 - Statistics (LOC, exports, classes, interfaces, functions, etc.)
->>>>>>> Stashed changes
