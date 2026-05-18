@@ -279,6 +279,30 @@ Promise.defer = function () {
 };
 
 /**
+ * Create a promise that resolves with the given value.
+ * Static helper matching the TypeScript declaration in
+ * `types/core/Promise.d.ts`. Without this, callers that used the
+ * documented static form crashed with "Promise.resolve is not a function"
+ * (the circuit breaker, memory-pressure-reject, and pre-aborted-signal
+ * paths in `Pool.exec`).
+ * @param {*} value
+ * @returns {Promise}
+ */
+Promise.resolve = function (value) {
+  return new Promise(function (resolve) { resolve(value); });
+};
+
+/**
+ * Create a promise that rejects with the given error. Sibling of
+ * `Promise.resolve` above; same TS-declared-but-unimplemented gap.
+ * @param {Error} error
+ * @returns {Promise}
+ */
+Promise.reject = function (error) {
+  return new Promise(function (_resolve, reject) { reject(error); });
+};
+
+/**
  * Create a cancellation error
  * @param {String} [message]
  * @extends Error

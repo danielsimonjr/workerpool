@@ -26,6 +26,21 @@ export interface ExecOptions<T = unknown> {
    * Useful for custom queue implementations (e.g., priority).
    */
   metadata?: T;
+
+  /**
+   * AbortSignal for cooperative cancellation. When supplied:
+   *   - if the signal is already aborted, `pool.exec(...)` returns a
+   *     pre-rejected promise (`CancellationError`) without ever
+   *     entering the queue;
+   *   - otherwise the pool subscribes to the signal's `abort` event
+   *     and calls `.cancel()` on the returned promise when it fires.
+   *
+   * The pool removes its listener when the promise settles so the
+   * same signal can be reused for many submissions without piling up
+   * listeners. This is the standard Node ecosystem cancellation
+   * pattern, compatible with `fetch`, `child_process`, `fs`, etc.
+   */
+  signal?: AbortSignal;
 }
 
 /**

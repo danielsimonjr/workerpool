@@ -274,10 +274,30 @@ Pool.prototype.exec = function (method, params, options) {
   }
 
   if (typeof method === "string") {
+    // AbortSignal integration. If the caller supplied an `options.signal`,
+    // a pre-aborted signal short-circuits to a rejected Promise; an active
+    // signal subscribes a one-shot listener that calls `.cancel()` on the
+    // returned promise. The listener is detached on settle so the same
+    // signal can be reused for many submissions without piling up
+    // listeners. This is the standard Node ecosystem cancellation pattern
+    // (fetch, child_process, fs all accept AbortSignal).
+    var signal = options && options.signal;
+    if (signal && signal.aborted) {
+      var preAbortErr = new Error('promise cancelled');
+      preAbortErr.name = 'CancellationError';
+      return Promise.reject(preAbortErr);
+    }
+
     var resolver = Promise.defer();
 
     if (this.taskQueue.size() >= this.maxQueueSize) {
       throw new Error("Max queue size of " + this.maxQueueSize + " reached");
+    }
+
+    var abortHandler = null;
+    if (signal) {
+      abortHandler = function () { resolver.promise.cancel(); };
+      signal.addEventListener('abort', abortHandler);
     }
 
     // Generate task ID and track start time
@@ -321,8 +341,15 @@ Pool.prototype.exec = function (method, params, options) {
 
     // Add completion tracking for enhanced features
     var originalPromise = resolver.promise;
+    var cleanupSignalListener = function () {
+      if (signal && abortHandler) {
+        signal.removeEventListener('abort', abortHandler);
+        abortHandler = null;
+      }
+    };
     originalPromise.then(
       function(result) {
+        cleanupSignalListener();
         var duration = Date.now() - startTime;
         self._onTaskComplete(taskId, duration, result, options && options.estimatedSize);
         if (self._circuitOptions.enabled) {
@@ -330,6 +357,7 @@ Pool.prototype.exec = function (method, params, options) {
         }
       },
       function(error) {
+        cleanupSignalListener();
         var duration = Date.now() - startTime;
         self._onTaskError(taskId, error, duration, options && options.estimatedSize);
         if (self._circuitOptions.enabled) {

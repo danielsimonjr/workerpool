@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 This is a fork of [josdejong/workerpool](https://github.com/josdejong/workerpool).
 
+## [10.2.0] - 2026-05-18
+
+### Added
+
+- **`AbortSignal` / `AbortController` integration in `pool.exec()`** —
+  `ExecOptions` now accepts an optional `signal?: AbortSignal`. Semantics:
+  - If the signal is **already aborted** at submission, `pool.exec(...)`
+    returns a pre-rejected promise (`CancellationError`) without entering
+    the queue.
+  - If the signal **fires during execution**, the pool calls `.cancel()`
+    on the returned `WorkerpoolPromise` so the running worker rejects
+    with `CancellationError`.
+  - The pool removes its listener when the promise settles so a single
+    `AbortController` can be reused across many submissions without
+    leaking listeners on the signal.
+  - Function-form `exec(fn, args, opts)` propagates the signal through
+    the internal `exec("run", ..., opts)` recursion — no separate
+    plumbing needed.
+
+  This is the standard Node ecosystem cancellation pattern, compatible
+  with `fetch`, `child_process`, `fs`, etc.
+
+  ```typescript
+  const ac = new AbortController();
+  const p = pool.exec('heavyTask', [data], { signal: ac.signal });
+  setTimeout(() => ac.abort(), 5000);   // cancel after 5s
+  try { await p; } catch (e) { /* CancellationError */ }
+  ```
+
+  Five-test suite at `test/js/Pool.signal.test.js` covers pre-abort,
+  mid-flight cancellation, normal settle (no leak), signal reuse across
+  multiple submissions, and one-signal-cancels-many in-flight execs.
+
+### Fixed
+
+- **`Promise.resolve` / `Promise.reject` runtime implementations** —
+  `types/core/Promise.d.ts` documented both static helpers
+  (`static resolve<T>(value)`, `static reject<E>(error)`) but
+  `src/js/Promise.js` only implemented `Promise.defer`. Three call sites
+  in `Pool.js` (`circuit breaker open`, `memory pressure reject`, and
+  the new `pre-aborted signal` path) crashed with
+  `TypeError: Promise.reject is not a function` when triggered. The
+  TS-declared shape now matches the runtime shape.
+
 ## [10.1.0] - 2026-01-11
 
 ### Added
