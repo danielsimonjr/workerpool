@@ -105,7 +105,7 @@
     "deps:compress": "npx tsx tools/compress-for-context/compress-for-context.ts"
   },
   "devDependencies": {
-    "@babel/core": "7.28.5",
+    "@babel/core": "7.29.6",
     "@babel/preset-env": "7.28.5",
     "@rollup/plugin-babel": "6.1.0",
     "@rollup/plugin-commonjs": "29.0.0",
