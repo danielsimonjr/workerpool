@@ -10,7 +10,16 @@ const pool = workerpool.pool(WorkerURL.toString(), {
 
 const Fibonacci: React.FC = () => {
   const [inputValue, setInputValue] = React.useState("30");
-  const [result, setResult] = React.useState({
+  // `cancel` is assigned a function below (see the setResult call in
+  // calculateFibonacci), so it must be typed `(() => void) | null`. Without this
+  // annotation useState infers it from the initial value as plain `null`, which
+  // made `result.cancel()` uncallable (TS2349) and the later assignment illegal
+  // (TS2322). The types were simply wrong — this went unnoticed because the
+  // `typecheck` script was broken by a stale project reference (see tsconfig.json).
+  const [result, setResult] = React.useState<{
+    result: string;
+    cancel: (() => void) | null;
+  }>({
     result: "",
     cancel: null,
   });
@@ -63,7 +72,7 @@ const Fibonacci: React.FC = () => {
         type="text"
         id="input"
         value={inputValue}
-        onInput={(e) => setInputValue(e.target.value)}
+        onInput={(e) => setInputValue(e.currentTarget.value)}
       />
       <input
         type="button"
@@ -80,7 +89,12 @@ const Fibonacci: React.FC = () => {
 const FibonacciWithFeedback: React.FC = () => {
   const [inputValue, setInputValue] = React.useState("25");
   const [feedback, setFeedback] = React.useState("");
-  const [result, setResult] = React.useState({
+  // Same fix as in Fibonacci above: `cancel` is assigned a function later, so it
+  // must be typed `(() => void) | null`. useState would otherwise infer plain `null`.
+  const [result, setResult] = React.useState<{
+    result: string;
+    cancel: (() => void) | null;
+  }>({
     result: "",
     cancel: null,
   });
@@ -138,7 +152,7 @@ const FibonacciWithFeedback: React.FC = () => {
         type="text"
         id="input"
         value={inputValue}
-        onInput={(e) => setInputValue(e.target.value)}
+        onInput={(e) => setInputValue(e.currentTarget.value)}
       />
       <input
         type="button"
@@ -165,7 +179,7 @@ const TransferArray: React.FC = () => {
 
     const size = parseInt(arraySize);
 
-    const promise = pool
+    pool
       .exec("createArray", [size], {
         on: function (array) {
           setFeedback(
@@ -194,7 +208,7 @@ const TransferArray: React.FC = () => {
         type="text"
         id="inputArraySize"
         value={arraySize}
-        onInput={(e) => setArraySize(e.target.value)}
+        onInput={(e) => setArraySize(e.currentTarget.value)}
       />
       <input
         type="button"

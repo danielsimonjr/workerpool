@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [Unreleased]
+
+### Fixed
+
+- **All 4 Dependabot alerts (examples only; the library itself was never affected).** They lived in
+  `examples/webpack5/package-lock.json` and `examples/vite/package-lock.json`. Regenerating both lockfiles
+  cleared most; the remaining 3 (`sockjs`, `uuid`, `webpack-dev-server`) all traced to one parent, so
+  `webpack-dev-server` was bumped `^5.2.5 → ^6.0.0` — **fixing the parent, not overriding the leaves**.
+  Both examples now report `found 0 vulnerabilities` and still build.
+- **`examples/webpack5`'s `typecheck` script has been broken, hiding real type errors.** `tsconfig.json`
+  referenced `tsconfig.node.json`, a **vestigial Vite-template artifact** with `"composite": true` and *no*
+  `include` — so it globbed everything (including `src/`), claimed to emit `src/*.d.ts`, and made every
+  `tsc` run die with `TS6305: Output file 'src/App.d.ts' has not been built from source file 'src/App.tsx'`.
+  This is a webpack example; that file (which exists to typecheck `vite.config.ts`) served no purpose and
+  was unreferenced. Removed it and the stale reference — which exposed the real type errors it had been
+  masking, all now fixed:
+  - `useState({ result: "", cancel: null })` in **both** `Fibonacci` and `FibonacciWithFeedback` inferred
+    `cancel` as plain `null`, yet a function is assigned to it later — so `result.cancel()` was uncallable
+    (`TS2349: Type 'never' has no call signatures`) and the assignment was illegal (`TS2322`). **The types
+    were simply wrong.** Now explicitly `(() => void) | null`.
+  - `onInput`'s `FormEvent` types `.target` as a bare `EventTarget`, so `e.target.value` was a `TS2339`.
+    Switched to `e.currentTarget.value`, which *is* typed as the element.
+  - Removed genuinely unused imports/bindings (`{ worker }`, `stream/consumers`'s `arrayBuffer`, the
+    `React` import under `jsx: "react-jsx"`, and a dead `promise` binding).
+  - In `isDetached`, `new Uint8Array(buffer)` is now called for its **side effect only** — constructing the
+    view is what throws on a detached buffer, so the value is deliberately unused. (Kept, with a comment:
+    deleting it as "unused" would silently remove the check.)
+  `npm run typecheck` now exits 0 for the first time; `npm run build` still passes.
 This is a fork of [josdejong/workerpool](https://github.com/josdejong/workerpool).
 
 ## [10.2.0] - 2026-05-18
