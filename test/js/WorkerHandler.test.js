@@ -562,6 +562,14 @@ describe('WorkerHandler', function () {
       // First, start a task to ensure worker is created
       handler.exec('run', [String(add), [2, 4]])
           .then(function () {
+            // Keep a reference to the real underlying worker: once we lie
+            // about `killed`, WorkerHandler#terminate takes the "already
+            // dead, nothing to clean up" branch and never actually kills
+            // this process/thread. Without killing it ourselves here, the
+            // real worker leaks and keeps the event loop (and the whole
+            // mocha run) alive forever.
+            var realWorker = handler.worker;
+
             // Manually mark worker as killed
             handler.worker.killed = true;
 
@@ -569,6 +577,12 @@ describe('WorkerHandler', function () {
             handler.terminate(false, function(err) {
               assert.ok(err instanceof Error);
               assert.ok(err.message.includes('worker already killed'));
+
+              // Clean up the real worker that terminate() skipped because
+              // it believed (incorrectly, per our fake flag) it was dead.
+              realWorker.killed = false;
+              realWorker.kill();
+
               done();
             });
           });
@@ -582,6 +596,12 @@ describe('WorkerHandler', function () {
       // First, start a task to ensure worker is created
       handler.exec('run', [String(add), [2, 4]])
           .then(function () {
+            // See comment in the 'workerAlreadyKilled' test above: faking
+            // `killed` makes WorkerHandler skip the real kill, so we must
+            // hold a reference and terminate it ourselves to avoid leaking
+            // the worker process/thread.
+            var realWorker = handler.worker;
+
             // Manually mark worker as killed to trigger error path
             handler.worker.killed = true;
 
@@ -593,6 +613,11 @@ describe('WorkerHandler', function () {
               .catch(function (err) {
                 assert.ok(err instanceof Error);
                 assert.ok(err.message.includes('worker already killed'));
+
+                // Clean up the real worker that terminate() skipped.
+                realWorker.killed = false;
+                realWorker.kill();
+
                 done();
               });
           });

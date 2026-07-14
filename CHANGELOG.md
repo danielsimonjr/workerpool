@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 This is a fork of [josdejong/workerpool](https://github.com/josdejong/workerpool).
 
+## [Unreleased]
+
+### Fixed
+
+- **CI hang: `npm test` never exited, burning the full 6h GitHub Actions job
+  timeout on every run of `master`.** Root-caused to two tests in
+  `test/js/WorkerHandler.test.js` (`workerAlreadyKilled` and
+  `terminateAndNotifyWithError`) that spawn a real worker, then fake
+  `handler.worker.killed = true` to exercise `WorkerHandler#terminate`'s
+  "already dead" error branch. `WorkerHandler.prototype.terminate` treats
+  `worker.killed === true` as "nothing to clean up" and returns without ever
+  calling `.kill()` or sending the terminate message — correct when the flag
+  is genuinely true, but these two tests set it on a *live* worker purely to
+  test the error message, so the real child process/thread was orphaned,
+  holding open a handle that kept the Node event loop (and the whole mocha
+  process) alive forever after all tests finished. Verified with a
+  background-process sample mid-run: mocha printed `2 passing` and returned
+  control, while the underlying `node.exe` worker processes it had spawned
+  remained alive indefinitely. Fix is test-only: both tests now capture a
+  reference to the real worker before faking the flag and explicitly kill it
+  after their assertions, so the leaked process/thread is actually cleaned
+  up. `WorkerHandler` itself is unchanged — its behavior given a genuinely
+  dead worker is correct.
+- **`npm run test:types` was silently broken** (only surfaced once the hang
+  above was fixed and the test chain could reach this step):
+  `test/js/types/workerpool-tests.ts` imported from `"../../types/"` /
+  `"../../types/queues"`, a path left over from before this fork moved JS
+  tests into `test/js/`. From the file's new location the path resolved to
+  the nonexistent `test/types/` instead of the project's `types/`, which
+  TypeScript reported as `TS2307: Cannot find module`, and cascaded into a
+  dozen spurious `implicit any` errors since the `wp` namespace failed to
+  resolve. Fixed the two relative imports to `"../../../types/"` /
+  `"../../../types/queues"`; `tsc -p test/js/types` now passes with zero
+  errors.
+- **CI workflow (`ci.yml`): added `timeout-minutes: 20` to the `build`
+  job.** Defensive measure so a future hang fails fast on the runner
+  instead of silently consuming the full 6-hour GitHub Actions default job
+  timeout, as happened on every run before this fix.
+
 ## [10.2.0] - 2026-05-18
 
 ### Added
