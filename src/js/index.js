@@ -1,7 +1,10 @@
 const {platform, isMainThread, cpus} = require('./environment');
 const {TerminateError} = require('./WorkerHandler');
 
-/** @typedef {import("./Pool")} Pool */
+// NOTE: named WorkerPool, not Pool: a JSDoc typedef `Pool` would merge with the
+// module-level `var Pool = require("./Pool")` value below and break declaration
+// emit (TS2395), which is why types/index.d.ts was previously unusable.
+/** @typedef {import("./Pool")} WorkerPool */
 /** @typedef {import("./types.js").WorkerPoolOptions} WorkerPoolOptions */
 /** @typedef {import("./types.js").WorkerRegisterOptions} WorkerRegisterOptions */
 
@@ -14,14 +17,14 @@ const {TerminateError} = require('./WorkerHandler');
  * @overload
  * Create a new worker pool
  * @param {WorkerPoolOptions} [script]
- * @returns {Pool} pool
+ * @returns {WorkerPool} pool
  */
 /**
  * @overload
  * Create a new worker pool
  * @param {string} [script]
  * @param {WorkerPoolOptions} [options]
- * @returns {Pool} pool
+ * @returns {WorkerPool} pool
  */
 function pool(script, options) {
   var Pool = require('./Pool');
@@ -77,10 +80,22 @@ exports.TerminateError = TerminateError;
 
 var Pool = require('./Pool');
 
-// Export Pool static methods for shared pool functionality
-exports.getSharedPool = Pool.getSharedPool;
-exports.terminateSharedPool = Pool.terminateSharedPool;
-exports.hasSharedPool = Pool.hasSharedPool;
+// Export Pool static methods for shared pool functionality.
+// Bound to locals first: `exports.x = Pool.x` makes TypeScript emit an export name
+// with no backing declaration (TS2304 "Cannot find name 'getSharedPool'"), which
+// broke types/index.d.ts. Behaviour is identical.
+const getSharedPool = Pool.getSharedPool;
+const terminateSharedPool = Pool.terminateSharedPool;
+const hasSharedPool = Pool.hasSharedPool;
+
+exports.getSharedPool = getSharedPool;
+exports.terminateSharedPool = terminateSharedPool;
+exports.hasSharedPool = hasSharedPool;
+
+// Export the Pool class itself, so consumers can reference the TYPE:
+//     const p: wp.Pool = wp.pool();
+// It was reachable only as `PoolEnhanced`, so `wp.Pool` did not typecheck (TS2724).
+exports.Pool = Pool;
 
 // Backward compatibility: PoolEnhanced is now an alias for Pool
 // All enhanced features are built into the base Pool class

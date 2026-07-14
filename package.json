@@ -69,13 +69,13 @@
     "README.md"
   ],
   "scripts": {
-    "build": "node scripts/build-js.mjs",
+    "build": "node scripts/build-js.mjs && npm run build:types",
     "build:js": "node scripts/build-js.mjs",
     "build:js:watch": "node scripts/build-js.mjs --watch",
     "build:ts": "tsup",
     "build:ts:watch": "tsup --watch",
     "build:ts:tsc": "node scripts/build-js.mjs --ts",
-    "build:types": "node scripts/build-js.mjs --types",
+    "build:types": "node scripts/build-js.mjs --types && npm run build:types:api",
     "build:all": "npm run build:js && npm run build:ts",
     "build:wasm": "npm run build:wasm:embed && npm run build:ts",
     "build:wasm:debug": "node scripts/build-wasm.mjs --debug",
@@ -102,7 +102,8 @@
     "validate:wasm": "node scripts/validate-wasm.mjs",
     "prepublishOnly": "npm run test && npm run build:all",
     "deps": "npx tsx tools/create-dependency-graph/create-dependency-graph.ts",
-    "deps:compress": "npx tsx tools/compress-for-context/compress-for-context.ts"
+    "deps:compress": "npx tsx tools/compress-for-context/compress-for-context.ts",
+    "build:types:api": "tsc -p tsconfig.types.json"
   },
   "devDependencies": {
     "@babel/core": "7.29.6",
