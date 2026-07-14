@@ -604,7 +604,19 @@ Pool.prototype.terminate = function (force, timeout) {
 
 /**
  * Retrieve statistics on tasks and workers.
- * @return {object} Returns an object with statistics including enhanced metrics
+ *
+ * Previously `@return {object}`, which erased the entire shape — `pool.stats().activeTasks`
+ * did not typecheck (TS2339). The shape below mirrors the object literal returned.
+ *
+ * @return {{
+ *   totalWorkers: number,
+ *   busyWorkers: number,
+ *   idleWorkers: number,
+ *   pendingTasks: number,
+ *   activeTasks: number,
+ *   circuitState: string,
+ *   estimatedQueueMemory: number
+ * }} Statistics on tasks and workers, including enhanced metrics.
  */
 Pool.prototype.stats = function () {
   var totalWorkers = this.workers.length;

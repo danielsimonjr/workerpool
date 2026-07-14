@@ -1,0 +1,44 @@
+// Declaration build for the JavaScript API (src/js/**).
+//
+// WHY THIS FILE EXISTS
+// --------------------
+// package.json declares:
+//     "main":  "src/js/index.js"
+//     "types": "types/index.d.ts"
+//     "exports": { ".": { "types": "./types/index.d.ts", ... } }
+//
+// ...but nothing produced `types/index.d.ts`. The root tsconfig.json is TS-only
+// (`allowJs: false`, `include: ["src/ts/**/*.ts"]`) and `tsconfig.build.json`
+// emits to `types/ts/` — i.e. declarations for src/ts, NOT for src/js, which is
+// the package's actual entry point. So consumers installing this package got
+// NO TypeScript types at all: the file `types` pointed at simply did not exist.
+//
+// This is a regression from the fork's restructure. Upstream's `build` runs
+// `rollup -c && npm run build:types`, where `build:types` is `tsc -p .` and the
+// root tsconfig emits the JS API's declarations. When this fork split src/ into
+// src/js + src/ts and moved to tsup, that JS declaration pass was lost.
+//
+// src/js carries JSDoc annotations, so TypeScript derives real (non-`any`) types
+// from them via allowJs + declaration.
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "declarationDir": "./types",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM"],
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "strict": false,
+    "noEmitOnError": false,
+    "types": ["node"]
+  },
+  "include": ["src/js/**/*.js"],
+  "exclude": ["node_modules", "src/js/generated", "**/*.test.js"]
+}

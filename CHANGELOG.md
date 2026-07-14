@@ -8,6 +8,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+- **The published package promised TypeScript types it did not ship.** `package.json` declared
+  `"types": "types/index.d.ts"` (and `exports["."].types` pointed there too) — **and nothing produced that
+  file.** The root `tsconfig.json` is TS-only (`allowJs: false`, `include: ["src/ts/**"]`) and
+  `tsconfig.build.json` emits to `types/ts/`, i.e. declarations for `src/ts` — never for `src/js`, which is
+  the package's actual `main`. **npm consumers got no types at all.** A regression from this fork's
+  restructure: upstream's `build` is `rollup -c && npm run build:types` (`tsc -p .`, which emits the JS
+  API's declarations); this fork's `build` had **no types step**. It only ever looked fine locally because a
+  `types/` directory from an older build layout was still sitting on disk — gitignored and never
+  regenerated. Fixed by adding `tsconfig.types.json` (allowJs + emitDeclarationOnly over `src/js/**`,
+  deriving real types from the existing JSDoc) and wiring it into `build`, exactly as upstream does.
+  Making the declarations actually compile then required three genuine source fixes:
+  - `index.js` had a JSDoc `@typedef {import("./Pool")} Pool` (a **type** named `Pool`) colliding with
+    `var Pool = require('./Pool')` (a **value** named `Pool`) → `TS2395`, which broke declaration emit for
+    the whole module. Typedef renamed to `WorkerPool`.
+  - `exports.getSharedPool = Pool.getSharedPool` made TypeScript emit an export name with no backing
+    declaration (`TS2304`). Bound to locals first. Behaviour identical.
+  - `exports.Pool = Pool` added: the class was only reachable as `PoolEnhanced`, so `const p: wp.Pool` did
+    not typecheck (`TS2724`) — even though upstream's own type test relies on it.
+  - `Pool.stats()` was declared `@return {object}`, erasing the shape — `pool.stats().activeTasks` did not
+    typecheck (`TS2339`). Now carries its real return type.
+- **`test/js/types/workerpool-tests.ts` was itself wrong** (and had never run — `npm test` hung for 6h and
+  was killed before reaching `test:types`). It had diverged from upstream in exactly two places, the same
+  mistake twice: `pool.exec<number>("add", …)` and `pool.exec<string>('hello')`. `Pool.exec`'s generic is
+  `T extends (...args: any[]) => any` — **T is the FUNCTION type, not the return type** — so passing
+  `number`/`string` violated the constraint and silently degraded every inference to `any`. Restored to
+  upstream's correct `exec<typeof add>` / `exec<() => string>`. The library's types were right all along.
+  `npm test` now passes end-to-end from a clean checkout (`217 passing`, `test:types` exit 0).
 ### Fixed
 
 - **All 4 Dependabot alerts (examples only; the library itself was never affected).** They lived in
