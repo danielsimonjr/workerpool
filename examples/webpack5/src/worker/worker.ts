@@ -1,5 +1,4 @@
-import { arrayBuffer } from "stream/consumers";
-import workerpool, { worker } from "workerpool";
+import workerpool from "workerpool";
 
 // a deliberately inefficient implementation of the fibonacci sequence
 function fibonacci(n: number): number {
@@ -20,7 +19,9 @@ function fibonacciWithFeedback(n: number): number {
 // As ArrayBuffer.prototype.detached is a rather recent feature it is not used here.
 function isDetached(buffer: ArrayBuffer): boolean {
   try {
-    const array = new Uint8Array(buffer);
+    // Constructing the view is the test: it THROWS if the buffer is detached.
+    // The value is deliberately unused — do not "simplify" this away.
+    new Uint8Array(buffer);
     return false;
   } catch (error) {
     return true;
