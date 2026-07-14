@@ -16,6 +16,10 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+    # Defensive: a hung test process (e.g. a leaked worker keeping the event
+    # loop open) must fail fast instead of silently burning the 6h GitHub
+    # Actions default job timeout on every run.
+    timeout-minutes: 20
 
     strategy:
       matrix:

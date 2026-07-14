@@ -13,7 +13,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/workerpool/workerpool-tests.ts
 
  */
-import * as wp from "../../types/";
+import * as wp from "../../../types/";
 
 wp.pool("foo");
 wp.pool({ minWorkers: 1 });
@@ -121,7 +121,7 @@ new wp.Transfer("foo", []);
 const p: Promise<string> = pool.exec<string>('hello').then((a) => a);
 
 // Test queue types
-import { FIFOQueue, LIFOQueue } from "../../types/queues";
+import { FIFOQueue, LIFOQueue } from "../../../types/queues";
 
 const fifoQueue = new FIFOQueue();
 const lifoQueue = new LIFOQueue();
