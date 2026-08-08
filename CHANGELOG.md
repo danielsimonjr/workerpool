@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- `fast-uri` -> 3.1.5 in `examples/webpack5`, clearing the last open advisory. Example
+  lockfiles are indexed by the dependency graph exactly like shipped ones, so an unpatched
+  example keeps a standing alert on the repo.
+
+
 
 - **The published package promised TypeScript types it did not ship.** `package.json` declared
   `"types": "types/index.d.ts"` (and `exports["."].types` pointed there too) — **and nothing produced that
