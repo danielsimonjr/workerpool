@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **workerpool** (`@danielsimonjr/workerpool`) is a thread pool implementation that runs on both Node.js and browsers. It offloads CPU-intensive tasks to worker processes/threads. This is a fork of [josdejong/workerpool](https://github.com/josdejong/workerpool) with additional TypeScript, WASM, and Bun runtime support.
 
-**Version**: 10.0.1
+**Version**: 10.2.1
 **License**: Apache-2.0
 
 ## Build & Test Commands

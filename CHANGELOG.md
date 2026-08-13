@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.2.1] - 2026-08-12
+
 ### Security
 
 - `fast-uri` -> 3.1.5 in `examples/webpack5`, clearing the last open advisory. Example
