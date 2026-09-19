@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.2.2] - 2026-09-19
+
 ### Fixed
 
 - **worker_threads workers hung under Bun.** Inside a `node:worker_threads` Worker, Bun defines
