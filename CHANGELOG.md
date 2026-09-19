@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **worker_threads workers hung under Bun.** Inside a `node:worker_threads` Worker, Bun defines
+  `self`, `postMessage` and `addEventListener`. The worker script checked those globals first and
+  took its browser branch, which listens on the global `message` event. Bun delivers the parent's
+  `worker.postMessage()` only to `parentPort`, so the worker reported ready but never received a
+  task, and `terminate()` waited for the full idle timeout. The worker script (`src/js/worker.js`,
+  `src/ts/workers/worker.ts`, and the regenerated embedded worker) now detects `worker_threads`
+  (`parentPort` present) first and uses the Node branch. Browsers and `child_process` workers are
+  unchanged. Added `test/runtime/worker-threads-check.js` (runs under `node` or `bun`) and
+  `test/js/worker-threads-runtime.test.js`, which runs it under Node, and under Bun when installed.
+
 ## [10.2.1] - 2026-08-12
 
 ### Security
