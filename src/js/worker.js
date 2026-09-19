@@ -50,7 +50,27 @@ var publicWorker = {
   emit: worker.emit
 };
 
-if (typeof self !== 'undefined' && typeof postMessage === 'function' && typeof addEventListener === 'function') {
+// True when this script runs inside a node:worker_threads Worker.
+//
+// Checked before the browser globals because Bun defines `self`,
+// `postMessage` and `addEventListener` inside worker_threads Workers, but
+// delivers the parent's `worker.postMessage()` only to `parentPort`. Taking
+// the browser branch there means the worker never receives a task.
+// Real Web Workers have no `process`, so they are not affected.
+function isNodeWorkerThread() {
+  if (typeof process === 'undefined' || !process.versions || !process.versions.node) {
+    return false;
+  }
+  try {
+    var WorkerThreads = require('worker_threads');
+    return !!(WorkerThreads && WorkerThreads.parentPort);
+  } catch (error) {
+    return false;
+  }
+}
+
+if (!isNodeWorkerThread() &&
+    typeof self !== 'undefined' && typeof postMessage === 'function' && typeof addEventListener === 'function') {
   // worker in the browser
   worker.on = function (event, callback) {
     addEventListener(event, function (message) {
